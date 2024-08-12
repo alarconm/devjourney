@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 export function LearningJourney() {
   const { projects } = useAppContext()
 
+  const sortedProjects = [...projects].sort((a, b) => b.progress - a.progress)
   const totalProjects = projects.length
   const completedProjects = projects.filter(project => project.progress === 100).length
   const overallProgress = totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0
@@ -26,10 +27,10 @@ export function LearningJourney() {
         </div>
         <div>
           <h3 className="text-lg font-semibold mb-2">Project Breakdown</h3>
-          {projects.map((project) => (
+          {sortedProjects.map((project) => (
             <div key={project.id} className="mb-2 flex items-center justify-between">
               <span>{project.title}</span>
-              <Badge>{project.progress}% Complete</Badge>
+              <Badge>{(project.progress ?? 0).toFixed(0)}% Complete</Badge>
             </div>
           ))}
         </div>

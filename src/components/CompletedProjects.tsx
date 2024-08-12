@@ -28,6 +28,14 @@ export function CompletedProjects() {
             </HoverCardTrigger>
             <HoverCardContent>
               <p>{project.description}</p>
+              <ul className="mt-2">
+                {project.milestones.map((milestone, index) => (
+                  <li key={index} className="flex items-center">
+                    <span className="mr-2">✓</span>
+                    {milestone.text}
+                  </li>
+                ))}
+              </ul>
             </HoverCardContent>
           </HoverCard>
         ))}
