@@ -2,17 +2,20 @@
 
 import { useState } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
+import { Idea } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
 export function ProjectIdeas() {
-  const { ideas, ideaOrder, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature } = useAppContext()
+  const { ideas, ideaOrder, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature, reorderIdeaFeatures } = useAppContext()
   const [newIdea, setNewIdea] = useState({ title: '', description: '', features: [] })
   const [newFeature, setNewFeature] = useState('')
+  const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
 
   const sortedIdeas = ideaOrder.map(id => ideas.find(i => i.id === id)).filter(Boolean) as Idea[]
 
@@ -22,11 +25,16 @@ export function ProjectIdeas() {
     const sourceIndex = result.source.index
     const destinationIndex = result.destination.index
 
-    if (result.destination.droppableId === 'currentProjects') {
-      moveIdeaToProject(sortedIdeas[sourceIndex].id)
-    } else {
+    if (result.type === 'idea') {
       reorderIdeas(sourceIndex, destinationIndex)
+    } else if (result.type === 'feature') {
+      const ideaId = result.draggableId.split('-')[0]
+      reorderIdeaFeatures(ideaId, sourceIndex, destinationIndex)
     }
+  }
+
+  const toggleExpand = (ideaId: string) => {
+    setExpandedIdeaId(expandedIdeaId === ideaId ? null : ideaId)
   }
 
   const handleAddIdea = () => {
@@ -46,7 +54,7 @@ export function ProjectIdeas() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Project Ideas</CardTitle>
+        <CardTitle className="text-primary">Project Ideas</CardTitle>
         <CardDescription>Capture your project ideas</CardDescription>
       </CardHeader>
       <CardContent>
@@ -66,27 +74,67 @@ export function ProjectIdeas() {
                         <Card>
                           <CardHeader>
                             <CardTitle>{idea.title}</CardTitle>
+                            <CardDescription>{idea.description}</CardDescription>
                           </CardHeader>
                           <CardContent>
-                            <p>{idea.description}</p>
-                            <h4 className="font-semibold mt-4 mb-2">Features:</h4>
-                            <ul className="space-y-2">
-                              {idea.features && idea.features.map((feature, featureIndex) => (
-                                <li key={featureIndex} className="bg-secondary p-2 rounded">{feature}</li>
-                              ))}
-                            </ul>
-                            <div className="mt-2 flex">
-                              <Input
-                                value={newFeature}
-                                onChange={(e) => setNewFeature(e.target.value)}
-                                placeholder="Add new feature"
-                                className="mr-2"
-                              />
-                              <Button onClick={() => handleAddFeature(idea.id)}>Add</Button>
-                            </div>
+                            <Button onClick={() => toggleExpand(idea.id)}>
+                              {expandedIdeaId === idea.id ? 'Hide Features' : 'Show Features'}
+                            </Button>
+                            {expandedIdeaId === idea.id && (
+                              <div className="mt-2">
+                                <Droppable droppableId={`features-${idea.id}`} type="feature">
+                                  {(provided) => (
+                                    <ul {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                      {idea.features && idea.features.map((feature, featureIndex) => (
+                                        <Draggable key={`${idea.id}-${featureIndex}`} draggableId={`${idea.id}-${featureIndex}`} index={featureIndex}>
+                                          {(provided) => (
+                                            <li
+                                              ref={provided.innerRef}
+                                              {...provided.draggableProps}
+                                              {...provided.dragHandleProps}
+                                              className="flex items-center bg-secondary p-2 rounded"
+                                            >
+                                              <span>{feature}</span>
+                                            </li>
+                                          )}
+                                        </Draggable>
+                                      ))}
+                                      {provided.placeholder}
+                                    </ul>
+                                  )}
+                                </Droppable>
+                                <div className="mt-2 flex">
+                                  <Input
+                                    value={newFeature}
+                                    onChange={(e) => setNewFeature(e.target.value)}
+                                    placeholder="Add new feature"
+                                    className="mr-2"
+                                  />
+                                  <Button onClick={() => handleAddFeature(idea.id)}>Add</Button>
+                                </div>
+                              </div>
+                            )}
                           </CardContent>
                           <CardFooter>
-                            <Button variant="destructive" onClick={() => removeIdea(idea.id)}>Remove</Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive">Remove</Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the idea.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => removeIdea(idea.id)}>
+                                    Remove
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                             <Button onClick={() => moveIdeaToProject(idea.id)} className="ml-2">Start Project</Button>
                           </CardFooter>
                         </Card>

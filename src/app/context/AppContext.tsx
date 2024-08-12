@@ -142,6 +142,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }
 
+  const reorderIdeaFeatures = (ideaId: string, startIndex: number, endIndex: number) => {
+    setIdeas(ideas.map(idea => {
+      if (idea.id === ideaId) {
+        const newFeatures = Array.from(idea.features)
+        const [removed] = newFeatures.splice(startIndex, 1)
+        newFeatures.splice(endIndex, 0, removed)
+        return { ...idea, features: newFeatures }
+      }
+      return idea
+    }))
+  }
+
   const moveIdeaToProject = (ideaId: string) => {
     const idea = ideas.find(i => i.id === ideaId)
     if (idea) {
@@ -212,6 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reorderIdeas,
     reorderProjects,
     reorderProjectFeatures,
+    reorderIdeaFeatures,
     moveIdeaToProject,
     clearAllProjects,
     addIdeaFeature,
