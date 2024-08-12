@@ -14,7 +14,7 @@ export function ProjectIdeas() {
 
   const handleAddIdea = () => {
     if (newIdea.title) {
-      addIdea({ ...newIdea, id: Date.now().toString() })
+      addIdea(newIdea)
       setNewIdea({ title: '', description: '' })
     }
   }
