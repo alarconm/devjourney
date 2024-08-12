@@ -26,6 +26,7 @@
     "next": "14.2.5",
     "next-themes": "^0.3.0",
     "react": "^18",
+    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18",
     "supabase": "^1.187.10",
     "swr": "^2.2.4",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
+    "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^18",
     "autoprefixer": "^10",
     "css-loader": "^7.1.2",
