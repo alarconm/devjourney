@@ -20,12 +20,19 @@ interface AppContextType {
   projects: Project[]
   ideas: Idea[]
   brainstormNotes: string[]
+  // eslint-disable-next-line no-unused-vars
   addProject: (project: Omit<Project, 'id'>) => void
+  // eslint-disable-next-line no-unused-vars
   updateProject: (project: Project) => void
+  // eslint-disable-next-line no-unused-vars
   removeProject: (id: string) => void
+  // eslint-disable-next-line no-unused-vars
   addIdea: (idea: Omit<Idea, 'id'>) => void
+  // eslint-disable-next-line no-unused-vars
   removeIdea: (id: string) => void
+  // eslint-disable-next-line no-unused-vars
   addBrainstormNote: (note: string) => void
+  // eslint-disable-next-line no-unused-vars
   removeBrainstormNote: (index: number) => void
 }
 
