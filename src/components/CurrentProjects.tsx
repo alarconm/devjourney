@@ -2,28 +2,34 @@
 
 import { useState } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
+import { Project } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects } = useAppContext()
+  const { projects, projectOrder, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
-  const onDragEnd = (result: any) => {
+  const sortedProjects = projectOrder
+    .map(id => projects.find(p => p.id === id))
+    .filter(Boolean) as Project[]
+
+  const onDragEnd = (result: DropResult) => {
     if (!result.destination) return
 
-    const { source, destination, type } = result
+    const sourceIndex = result.source.index
+    const destinationIndex = result.destination.index
 
-    if (type === 'project') {
-      reorderProjects(source.index, destination.index)
-    } else if (type === 'feature') {
+    if (result.type === 'project') {
+      reorderProjects(sourceIndex, destinationIndex)
+    } else if (result.type === 'feature') {
       const projectId = result.draggableId.split('-')[0]
-      reorderProjectFeatures(projectId, source.index, destination.index)
+      reorderProjectFeatures(projectId, sourceIndex, destinationIndex)
     }
   }
 
@@ -32,7 +38,7 @@ export function CurrentProjects() {
   }
 
   return (
-    <Card className="bg-secondary">
+    <Card>
       <CardHeader>
         <CardTitle className="text-primary">Current Projects</CardTitle>
         <CardDescription>Track your ongoing projects</CardDescription>
@@ -45,7 +51,7 @@ export function CurrentProjects() {
           <Droppable droppableId="currentProjects" type="project">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {projects.filter(project => project.progress < 100).map((project, index) => (
+                {sortedProjects.map((project, index) => (
                   <Draggable key={project.id} draggableId={project.id} index={index}>
                     {(provided) => (
                       <div
@@ -66,18 +72,32 @@ export function CurrentProjects() {
                             </Button>
                             {expandedProjectId === project.id && (
                               <div className="mt-2">
-                                <ul className="space-y-2">
-                                  {project.features.map((feature, index) => (
-                                    <li key={index} className="flex items-center bg-secondary p-2 rounded">
-                                      <Checkbox
-                                        checked={feature.completed}
-                                        onCheckedChange={() => toggleProjectFeature(project.id, index)}
-                                        className="mr-2"
-                                      />
-                                      <span className={feature.completed ? 'line-through' : ''}>{feature.text}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                                <Droppable droppableId={`features-${project.id}`} type="feature">
+                                  {(provided) => (
+                                    <ul {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                      {project.features && project.features.map((feature, featureIndex) => (
+                                        <Draggable key={`${project.id}-${featureIndex}`} draggableId={`${project.id}-${featureIndex}`} index={featureIndex}>
+                                          {(provided) => (
+                                            <li
+                                              ref={provided.innerRef}
+                                              {...provided.draggableProps}
+                                              {...provided.dragHandleProps}
+                                              className="flex items-center bg-secondary p-2 rounded"
+                                            >
+                                              <Checkbox
+                                                checked={feature.completed}
+                                                onCheckedChange={() => toggleProjectFeature(project.id, featureIndex)}
+                                                className="mr-2"
+                                              />
+                                              <span className={feature.completed ? 'line-through' : ''}>{feature.text}</span>
+                                            </li>
+                                          )}
+                                        </Draggable>
+                                      ))}
+                                      {provided.placeholder}
+                                    </ul>
+                                  )}
+                                </Droppable>
                                 <div className="mt-2 flex">
                                   <Input
                                     value={newFeature}

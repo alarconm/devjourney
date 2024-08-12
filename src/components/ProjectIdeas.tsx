@@ -10,16 +10,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 
 export function ProjectIdeas() {
-  const { ideas, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature } = useAppContext()
+  const { ideas, ideaOrder, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature } = useAppContext()
   const [newIdea, setNewIdea] = useState({ title: '', description: '', features: [] })
   const [newFeature, setNewFeature] = useState('')
 
-  const onDragEnd = (result: any) => {
+  const sortedIdeas = ideaOrder.map(id => ideas.find(i => i.id === id)).filter(Boolean) as Idea[]
+
+  const onDragEnd = (result: DropResult) => {
     if (!result.destination) return
+
+    const sourceIndex = result.source.index
+    const destinationIndex = result.destination.index
+
     if (result.destination.droppableId === 'currentProjects') {
-      moveIdeaToProject(result.draggableId)
+      moveIdeaToProject(sortedIdeas[sourceIndex].id)
     } else {
-      reorderIdeas(result.source.index, result.destination.index)
+      reorderIdeas(sourceIndex, destinationIndex)
     }
   }
 
@@ -48,7 +54,7 @@ export function ProjectIdeas() {
           <Droppable droppableId="ideas" type="idea">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {ideas.map((idea, index) => (
+                {sortedIdeas.map((idea, index) => (
                   <Draggable key={idea.id} draggableId={idea.id} index={index}>
                     {(provided) => (
                       <div
@@ -65,8 +71,8 @@ export function ProjectIdeas() {
                             <p>{idea.description}</p>
                             <h4 className="font-semibold mt-4 mb-2">Features:</h4>
                             <ul className="space-y-2">
-                              {idea.features && idea.features.map((feature, index) => (
-                                <li key={index} className="bg-secondary p-2 rounded">{feature}</li>
+                              {idea.features && idea.features.map((feature, featureIndex) => (
+                                <li key={featureIndex} className="bg-secondary p-2 rounded">{feature}</li>
                               ))}
                             </ul>
                             <div className="mt-2 flex">

@@ -1,9 +1,9 @@
 "use client"
 
-import React, { createContext, useContext, ReactNode } from 'react'
+import React, { createContext, useContext, ReactNode, useState } from 'react'
 import { useLocalStorage } from '@/app/hooks/useLocalStorage'
 
-interface Project {
+export interface Project {
   id: string
   title: string
   description: string
@@ -11,7 +11,7 @@ interface Project {
   features: { text: string; completed: boolean }[]
 }
 
-interface Idea {
+export interface Idea {
   id: string
   title: string
   description: string
@@ -21,6 +21,8 @@ interface Idea {
 interface AppContextType {
   projects: Project[]
   ideas: Idea[]
+  projectOrder: string[]
+  ideaOrder: string[]
   addProject: (project: Omit<Project, 'id' | 'progress' | 'features'>) => void
   updateProject: (project: Project) => void
   removeProject: (id: string) => void
@@ -41,6 +43,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', [])
   const [ideas, setIdeas] = useLocalStorage<Idea[]>('ideas', [])
+  const [projectOrder, setProjectOrder] = useLocalStorage<string[]>('projectOrder', [])
+  const [ideaOrder, setIdeaOrder] = useLocalStorage<string[]>('ideaOrder', [])
 
   const addProject = (project: Omit<Project, 'id' | 'progress' | 'features'>) => {
     const newProject: Project = {
@@ -49,7 +53,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       progress: 0,
       features: []
     }
-    setProjects([...projects, newProject])
+    setProjects(prevProjects => [...prevProjects, newProject])
+    setProjectOrder(prevOrder => [...prevOrder, newProject.id])
   }
 
   const updateProject = (updatedProject: Project) => {
@@ -57,7 +62,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const removeProject = (id: string) => {
-    setProjects(projects.filter(p => p.id !== id))
+    setProjects(prevProjects => prevProjects.filter(p => p.id !== id))
+    setProjectOrder(prevOrder => prevOrder.filter(projectId => projectId !== id))
   }
 
   const addIdea = (idea: Omit<Idea, 'id'>) => {
@@ -102,17 +108,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const reorderIdeas = (startIndex: number, endIndex: number) => {
-    const result = Array.from(ideas)
-    const [removed] = result.splice(startIndex, 1)
-    result.splice(endIndex, 0, removed)
-    setIdeas(result)
+    setIdeaOrder((prevOrder) => {
+      const result = Array.from(prevOrder);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return result;
+    });
   }
 
   const reorderProjects = (startIndex: number, endIndex: number) => {
-    const result = Array.from(projects)
-    const [removed] = result.splice(startIndex, 1)
-    result.splice(endIndex, 0, removed)
-    setProjects(result)
+    setProjectOrder(prevOrder => {
+      const result = Array.from(prevOrder);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return result;
+    });
   }
 
   const reorderProjectFeatures = (projectId: string, startIndex: number, endIndex: number) => {
@@ -155,10 +165,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }
 
+  const updateProjectOrder = () => {
+    const currentIds = projects.map(p => p.id);
+    const newOrder = projectOrder.filter(id => currentIds.includes(id));
+    const missingIds = currentIds.filter(id => !newOrder.includes(id));
+    setProjectOrder([...newOrder, ...missingIds]);
+  };
+
+  const updateIdeaOrder = () => {
+    const currentIds = ideas.map(i => i.id);
+    const newOrder = ideaOrder.filter(id => currentIds.includes(id));
+    const missingIds = currentIds.filter(id => !newOrder.includes(id));
+    setIdeaOrder([...newOrder, ...missingIds]);
+  };
+
+  React.useEffect(() => {
+    updateProjectOrder();
+  }, [projects]);
+
+  React.useEffect(() => {
+    updateIdeaOrder();
+  }, [ideas]);
+
   return (
     <AppContext.Provider value={{
       projects,
       ideas,
+      projectOrder,
+      ideaOrder,
       addProject,
       updateProject,
       removeProject,
