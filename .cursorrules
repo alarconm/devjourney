@@ -1,0 +1,257 @@
+# DevJourney Helper App - AI Rules
+
+# General
+- Use TypeScript for all code
+- Follow ESLint and Prettier configurations for code style
+- Use functional components and hooks in React
+- Implement proper error handling and logging
+- Write clear, concise comments for complex logic
+
+# Next.js
+- Use the App Router for routing
+- Implement server-side rendering (SSR) where appropriate
+- Utilize Next.js API routes for backend functionality
+- Use Next.js Image component for optimized image loading
+- Implement dynamic imports for code splitting
+
+# React
+- Use React hooks (useState, useEffect, useContext, etc.) appropriately
+- Implement custom hooks for reusable logic
+- Use React Context for global state management
+- Implement proper prop typing for components
+
+# Supabase
+- Use Supabase client for database operations
+- Implement proper error handling for Supabase queries
+- Use Supabase Auth for user authentication
+- Utilize Supabase real-time subscriptions where appropriate
+
+# UI/UX
+- Use Tailwind CSS for styling
+- Implement shadcn/ui components consistently
+- Ensure responsive design for all screen sizes
+- Implement proper accessibility (a11y) practices
+- Use Framer Motion for animations
+
+# State Management
+- Use React Context for global state
+- Implement local state with useState for component-specific state
+- Consider using SWR or React Query for remote data fetching and caching
+
+# Performance
+- Implement proper memoization (useMemo, useCallback) where necessary
+- Use React.lazy and Suspense for code splitting
+- Optimize images and assets
+- Implement proper caching strategies
+
+# Testing
+- Write unit tests for components and utility functions
+- Implement integration tests for key user flows
+- Use Jest and React Testing Library for testing
+
+# Security
+- Implement proper authentication and authorization
+- Sanitize user inputs to prevent XSS attacks
+- Use environment variables for sensitive information
+- Implement CSRF protection
+
+# API
+- Use RESTful principles for API design
+- Implement proper error handling and status codes
+- Use JSON for data exchange
+- Implement rate limiting for API routes
+
+# Versioning and Documentation
+- Use semantic versioning for the project
+- Maintain a changelog
+- Write clear documentation for components and functions
+- Use JSDoc comments for better IDE integration
+
+# AI Integration (v0)
+- Use v0 for UI generation consistently
+- Implement proper error handling for v0 API calls
+- Cache v0 responses when appropriate to reduce API usage
+
+# Deployment (Vercel)
+- Configure proper environment variables in Vercel
+- Set up proper build and deployment scripts
+- Implement preview deployments for pull requests
+
+# Continuous Integration/Continuous Deployment (CI/CD)
+- Set up GitHub Actions for automated testing and deployment
+- Implement proper staging and production environments
+
+# Feature Management
+- Use feature flags for gradual rollout of new features
+- Implement A/B testing capabilities
+
+# Monitoring and Analytics
+- Implement error tracking (e.g., Sentry)
+- Set up performance monitoring
+- Implement user analytics
+
+# Accessibility
+- Ensure proper keyboard navigation
+- Implement ARIA attributes where necessary
+- Ensure sufficient color contrast
+
+# Internationalization (i18n)
+- Implement multi-language support using next-i18next
+- Use ICU message format for complex translations
+
+# Progressive Web App (PWA)
+- Implement service workers for offline functionality
+- Add a web app manifest for installability
+
+# Code Generation
+- When generating new code, ensure it integrates seamlessly with existing features
+- Avoid removing or breaking existing functionality when adding new features
+- Generate comprehensive test cases for new features
+
+# Project Structure
+- Maintain a clear and consistent project structure
+- Group related components and utilities
+- Use absolute imports for better code organization
+
+# Performance Optimization
+- Implement code splitting and lazy loading
+- Optimize images and other assets
+- Use web workers for computationally intensive tasks
+
+# Error Handling
+- Implement a global error boundary
+- Provide user-friendly error messages
+- Log errors for debugging purposes
+
+# Data Fetching
+- Use SWR or React Query for efficient data fetching and caching
+- Implement proper loading and error states for data fetching
+
+# Form Handling
+- Use Formik or react-hook-form for complex forms
+- Implement proper form validation
+
+# Code Quality
+- Maintain a consistent coding style
+- Use meaningful variable and function names
+- Keep functions small and focused on a single responsibility
+
+# Scalability
+- Design the application architecture to be scalable
+- Use appropriate caching strategies
+- Implement database indexing for improved query performance
+
+# User Experience
+- Implement skeleton loaders for better perceived performance
+- Use appropriate loading indicators
+- Implement proper form validation feedback
+
+# SEO
+- Use appropriate meta tags
+- Implement structured data where applicable
+- Ensure proper semantic HTML structure
+
+# Collaboration
+- Use meaningful commit messages
+- Create detailed pull requests with proper descriptions
+- Implement code reviews for all changes
+
+# Documentation
+- Maintain up-to-date README and CONTRIBUTING files
+- Document complex algorithms and business logic
+- Use inline comments for clarity where necessary
+
+# Refactoring
+- Regularly refactor code to improve readability and maintainability
+- Use automated refactoring tools when available
+
+# Dependency Management
+- Regularly update dependencies
+- Use a package manager lock file (e.g., yarn.lock)
+- Be cautious of breaking changes in dependency updates
+
+# Code Reusability
+- Create reusable components and hooks
+- Implement a component library for consistent UI elements
+
+# Performance Budgets
+- Set and enforce performance budgets (e.g., bundle size, load time)
+- Regularly audit and optimize performance
+
+# Accessibility (a11y)
+- Ensure proper keyboard navigation
+- Use appropriate ARIA attributes
+- Maintain sufficient color contrast
+
+# Security
+- Implement proper authentication and authorization
+- Use HTTPS for all network requests
+- Sanitize user inputs to prevent XSS attacks
+
+# Logging
+- Implement proper logging for debugging and monitoring
+- Use structured logging for easier parsing and analysis
+
+# Configuration Management
+- Use environment variables for configuration
+- Implement feature flags for gradual rollout of new features
+
+# Code Generation
+- When generating code, ensure it follows the project's coding standards
+- Generate appropriate test cases for new code
+
+# Error Handling
+- Implement proper error boundaries in React components
+- Provide user-friendly error messages
+- Log errors for debugging purposes
+
+# Performance Optimization
+- Implement code splitting and lazy loading
+- Optimize images and other assets
+- Use web workers for computationally intensive tasks
+
+# Data Management
+- Implement proper data normalization
+- Use appropriate caching strategies
+- Implement optimistic UI updates for better user experience
+
+# Testing
+- Write unit tests for components and utility functions
+- Implement integration tests for key user flows
+- Use Jest and React Testing Library for testing
+- Implement end-to-end tests for critical paths
+
+# Continuous Integration/Continuous Deployment (CI/CD)
+- Set up automated testing in the CI pipeline
+- Implement automated deployments to staging and production environments
+- Use feature flags for safer deployments
+
+# Code Reviews
+- Enforce code reviews for all pull requests
+- Use automated code quality checks in the CI pipeline
+
+# Documentation
+- Maintain up-to-date README and CONTRIBUTING files
+- Document complex algorithms and business logic
+- Use inline comments for clarity where necessary
+
+# Refactoring
+- Regularly refactor code to improve readability and maintainability
+- Use automated refactoring tools when available
+
+# Dependency Management
+- Regularly update dependencies
+- Use a package manager lock file (e.g., yarn.lock)
+- Be cautious of breaking changes in dependency updates
+
+# Code Reusability
+- Create reusable components and hooks
+- Implement a component library for consistent UI elements
+
+# Performance Budgets
+- Set and enforce performance budgets (e.g., bundle size, load time)
+- Regularly audit and optimize performance
+
+# Accessibility (a11y)
+- Ensure proper keyboard navigation
+
