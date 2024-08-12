@@ -10,8 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectMilestone, toggleProjectMilestone, reorderProjects, reorderProjectMilestones, clearAllProjects } = useAppContext()
-  const [newMilestone, setNewMilestone] = useState('')
+  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects } = useAppContext()
+  const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
   const onDragEnd = (result: any) => {
@@ -21,9 +21,9 @@ export function CurrentProjects() {
 
     if (type === 'project') {
       reorderProjects(source.index, destination.index)
-    } else if (type === 'milestone') {
+    } else if (type === 'feature') {
       const projectId = result.draggableId.split('-')[0]
-      reorderProjectMilestones(projectId, source.index, destination.index)
+      reorderProjectFeatures(projectId, source.index, destination.index)
     }
   }
 
@@ -62,32 +62,32 @@ export function CurrentProjects() {
                           <CardContent>
                             <Progress value={project.progress} className="mb-2" />
                             <Button onClick={() => toggleExpand(project.id)}>
-                              {expandedProjectId === project.id ? 'Hide Milestones' : 'Show Milestones'}
+                              {expandedProjectId === project.id ? 'Hide Features' : 'Show Features'}
                             </Button>
                             {expandedProjectId === project.id && (
                               <div className="mt-2">
                                 <ul className="space-y-2">
-                                  {project.milestones.map((milestone, index) => (
-                                    <li key={index} className="flex items-center">
+                                  {project.features.map((feature, index) => (
+                                    <li key={index} className="flex items-center bg-secondary p-2 rounded">
                                       <Checkbox
-                                        checked={milestone.completed}
-                                        onCheckedChange={() => toggleProjectMilestone(project.id, index)}
+                                        checked={feature.completed}
+                                        onCheckedChange={() => toggleProjectFeature(project.id, index)}
                                         className="mr-2"
                                       />
-                                      <span className={milestone.completed ? 'line-through' : ''}>{milestone.text}</span>
+                                      <span className={feature.completed ? 'line-through' : ''}>{feature.text}</span>
                                     </li>
                                   ))}
                                 </ul>
                                 <div className="mt-2 flex">
                                   <Input
-                                    value={newMilestone}
-                                    onChange={(e) => setNewMilestone(e.target.value)}
-                                    placeholder="Add new milestone"
+                                    value={newFeature}
+                                    onChange={(e) => setNewFeature(e.target.value)}
+                                    placeholder="Add new feature"
                                     className="mr-2"
                                   />
                                   <Button onClick={() => {
-                                    addProjectMilestone(project.id, newMilestone)
-                                    setNewMilestone('')
+                                    addProjectFeature(project.id, newFeature)
+                                    setNewFeature('')
                                   }}>Add</Button>
                                 </div>
                               </div>

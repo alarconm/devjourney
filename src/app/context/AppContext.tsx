@@ -8,32 +8,32 @@ interface Project {
   title: string
   description: string
   progress: number
-  milestones: { text: string; completed: boolean }[]
+  features: { text: string; completed: boolean }[]
 }
 
 interface Idea {
   id: string
   title: string
   description: string
-  milestones: string[]
+  features: string[]
 }
 
 interface AppContextType {
   projects: Project[]
   ideas: Idea[]
-  addProject: (project: Omit<Project, 'id' | 'progress' | 'milestones'>) => void
+  addProject: (project: Omit<Project, 'id' | 'progress' | 'features'>) => void
   updateProject: (project: Project) => void
   removeProject: (id: string) => void
   addIdea: (idea: Omit<Idea, 'id'>) => void
   removeIdea: (id: string) => void
-  addProjectMilestone: (projectId: string, milestone: string) => void
-  toggleProjectMilestone: (projectId: string, milestoneIndex: number) => void
+  addProjectFeature: (projectId: string, feature: string) => void
+  toggleProjectFeature: (projectId: string, featureIndex: number) => void
   reorderIdeas: (startIndex: number, endIndex: number) => void
   reorderProjects: (startIndex: number, endIndex: number) => void
-  reorderProjectMilestones: (projectId: string, startIndex: number, endIndex: number) => void
+  reorderProjectFeatures: (projectId: string, startIndex: number, endIndex: number) => void
   moveIdeaToProject: (ideaId: string) => void
   clearAllProjects: () => void
-  addIdeaMilestone: (ideaId: string, milestone: string) => void
+  addIdeaFeature: (ideaId: string, feature: string) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -42,12 +42,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', [])
   const [ideas, setIdeas] = useLocalStorage<Idea[]>('ideas', [])
 
-  const addProject = (project: Omit<Project, 'id' | 'progress' | 'milestones'>) => {
+  const addProject = (project: Omit<Project, 'id' | 'progress' | 'features'>) => {
     const newProject: Project = {
       ...project,
       id: Date.now().toString(),
       progress: 0,
-      milestones: []
+      features: []
     }
     setProjects([...projects, newProject])
   }
@@ -64,7 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newIdea: Idea = {
       ...idea,
       id: Date.now().toString(),
-      milestones: idea.milestones || []
+      features: idea.features || []
     }
     setIdeas([...ideas, newIdea])
   }
@@ -73,32 +73,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIdeas(ideas.filter(i => i.id !== id))
   }
 
-  const addProjectMilestone = (projectId: string, milestone: string) => {
+  const addProjectFeature = (projectId: string, feature: string) => {
     setProjects(projects.map(p => {
       if (p.id === projectId) {
-        const newMilestones = [...p.milestones, { text: milestone, completed: false }]
-        const progress = calculateProgress(newMilestones)
-        return { ...p, milestones: newMilestones, progress }
+        const newFeatures = [...p.features, { text: feature, completed: false }]
+        const progress = calculateProgress(newFeatures)
+        return { ...p, features: newFeatures, progress }
       }
       return p
     }))
   }
 
-  const toggleProjectMilestone = (projectId: string, milestoneIndex: number) => {
+  const toggleProjectFeature = (projectId: string, featureIndex: number) => {
     setProjects(projects.map(p => {
       if (p.id === projectId) {
-        const newMilestones = [...p.milestones]
-        newMilestones[milestoneIndex].completed = !newMilestones[milestoneIndex].completed
-        const progress = calculateProgress(newMilestones)
-        return { ...p, milestones: newMilestones, progress }
+        const newFeatures = [...p.features]
+        newFeatures[featureIndex].completed = !newFeatures[featureIndex].completed
+        const progress = calculateProgress(newFeatures)
+        return { ...p, features: newFeatures, progress }
       }
       return p
     }))
   }
 
-  const calculateProgress = (milestones: { completed: boolean }[]): number => {
-    const completedMilestones = milestones.filter(m => m.completed).length
-    return milestones.length > 0 ? (completedMilestones / milestones.length) * 100 : 0
+  const calculateProgress = (features: { completed: boolean }[]): number => {
+    const completedFeatures = features.filter(m => m.completed).length
+    return features.length > 0 ? (completedFeatures / features.length) * 100 : 0
   }
 
   const reorderIdeas = (startIndex: number, endIndex: number) => {
@@ -115,13 +115,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjects(result)
   }
 
-  const reorderProjectMilestones = (projectId: string, startIndex: number, endIndex: number) => {
+  const reorderProjectFeatures = (projectId: string, startIndex: number, endIndex: number) => {
     setProjects(projects.map(p => {
       if (p.id === projectId) {
-        const newMilestones = Array.from(p.milestones)
-        const [removed] = newMilestones.splice(startIndex, 1)
-        newMilestones.splice(endIndex, 0, removed)
-        return { ...p, milestones: newMilestones }
+        const newFeatures = Array.from(p.features)
+        const [removed] = newFeatures.splice(startIndex, 1)
+        newFeatures.splice(endIndex, 0, removed)
+        return { ...p, features: newFeatures }
       }
       return p
     }))
@@ -135,7 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         title: idea.title,
         description: idea.description,
         progress: 0,
-        milestones: idea.milestones ? idea.milestones.map(m => ({ text: m, completed: false })) : []
+        features: idea.features ? idea.features.map(m => ({ text: m, completed: false })) : []
       }
       setProjects([...projects, newProject])
       setIdeas(ideas.filter(i => i.id !== ideaId))
@@ -146,10 +146,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjects([])
   }
 
-  const addIdeaMilestone = (ideaId: string, milestone: string) => {
+  const addIdeaFeature = (ideaId: string, feature: string) => {
     setIdeas(ideas.map(idea => {
       if (idea.id === ideaId) {
-        return { ...idea, milestones: [...(idea.milestones || []), milestone] }
+        return { ...idea, features: [...(idea.features || []), feature] }
       }
       return idea
     }))
@@ -164,14 +164,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeProject,
       addIdea,
       removeIdea,
-      addProjectMilestone,
-      toggleProjectMilestone,
+      addProjectFeature,
+      toggleProjectFeature,
       reorderIdeas,
       reorderProjects,
-      reorderProjectMilestones,
+      reorderProjectFeatures,
       moveIdeaToProject,
       clearAllProjects,
-      addIdeaMilestone
+      addIdeaFeature
     }}>
       {children}
     </AppContext.Provider>

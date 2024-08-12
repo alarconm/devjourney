@@ -10,9 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 
 export function ProjectIdeas() {
-  const { ideas, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaMilestone } = useAppContext()
-  const [newIdea, setNewIdea] = useState({ title: '', description: '', milestones: [] })
-  const [newMilestone, setNewMilestone] = useState('')
+  const { ideas, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature } = useAppContext()
+  const [newIdea, setNewIdea] = useState({ title: '', description: '', features: [] })
+  const [newFeature, setNewFeature] = useState('')
 
   const onDragEnd = (result: any) => {
     if (!result.destination) return
@@ -25,15 +25,15 @@ export function ProjectIdeas() {
 
   const handleAddIdea = () => {
     if (newIdea.title && newIdea.description) {
-      addIdea({ ...newIdea, milestones: [] })
-      setNewIdea({ title: '', description: '', milestones: [] })
+      addIdea({ ...newIdea, features: [] })
+      setNewIdea({ title: '', description: '', features: [] })
     }
   }
 
-  const handleAddMilestone = (ideaId: string) => {
-    if (newMilestone) {
-      addIdeaMilestone(ideaId, newMilestone)
-      setNewMilestone('')
+  const handleAddFeature = (ideaId: string) => {
+    if (newFeature) {
+      addIdeaFeature(ideaId, newFeature)
+      setNewFeature('')
     }
   }
 
@@ -63,19 +63,20 @@ export function ProjectIdeas() {
                           </CardHeader>
                           <CardContent>
                             <p>{idea.description}</p>
-                            <ul className="mt-2">
-                              {idea.milestones && idea.milestones.map((milestone, index) => (
-                                <li key={index}>{milestone}</li>
+                            <h4 className="font-semibold mt-4 mb-2">Features:</h4>
+                            <ul className="space-y-2">
+                              {idea.features && idea.features.map((feature, index) => (
+                                <li key={index} className="bg-secondary p-2 rounded">{feature}</li>
                               ))}
                             </ul>
                             <div className="mt-2 flex">
                               <Input
-                                value={newMilestone}
-                                onChange={(e) => setNewMilestone(e.target.value)}
-                                placeholder="Add new milestone"
+                                value={newFeature}
+                                onChange={(e) => setNewFeature(e.target.value)}
+                                placeholder="Add new feature"
                                 className="mr-2"
                               />
-                              <Button onClick={() => handleAddMilestone(idea.id)}>Add</Button>
+                              <Button onClick={() => handleAddFeature(idea.id)}>Add</Button>
                             </div>
                           </CardContent>
                           <CardFooter>

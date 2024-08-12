@@ -29,10 +29,10 @@ export function CompletedProjects() {
             <HoverCardContent>
               <p>{project.description}</p>
               <ul className="mt-2">
-                {project.milestones.map((milestone, index) => (
+                {project.features && project.features.map((feature, index) => (
                   <li key={index} className="flex items-center">
                     <span className="mr-2">✓</span>
-                    {milestone.text}
+                    {feature.text}
                   </li>
                 ))}
               </ul>
