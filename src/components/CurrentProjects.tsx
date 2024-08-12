@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 
 export function CurrentProjects() {
-  const { projects, projectOrder, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects } = useAppContext()
+  const { projects, projectOrder, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects, moveProjectToCompleted } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
@@ -36,6 +36,23 @@ export function CurrentProjects() {
   const toggleExpand = (projectId: string) => {
     setExpandedProjectId(expandedProjectId === projectId ? null : projectId)
   }
+
+  const checkAndMoveCompletedProject = (projectId: string, featureIndex: number) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      const updatedFeatures = project.features.map((f, i) => 
+        i === featureIndex ? { ...f, completed: !f.completed } : f
+      );
+      const completedFeatures = updatedFeatures.filter(f => f.completed).length;
+      const progress = (completedFeatures / updatedFeatures.length) * 100;
+
+      if (progress === 100) {
+        moveProjectToCompleted(projectId);
+      } else {
+        updateProject({ ...project, features: updatedFeatures, progress });
+      }
+    }
+  };
 
   return (
     <Card>
@@ -86,7 +103,9 @@ export function CurrentProjects() {
                                             >
                                               <Checkbox
                                                 checked={feature.completed}
-                                                onCheckedChange={() => toggleProjectFeature(project.id, featureIndex)}
+                                                onCheckedChange={() => {
+                                                  checkAndMoveCompletedProject(project.id, featureIndex);
+                                                }}
                                                 className="mr-2"
                                               />
                                               <span className={feature.completed ? 'line-through' : ''}>{feature.text}</span>

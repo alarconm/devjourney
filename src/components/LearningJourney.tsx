@@ -6,12 +6,13 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 
 export function LearningJourney() {
-  const { projects } = useAppContext()
+  const { projects, completedProjects } = useAppContext()
 
-  const sortedProjects = [...projects].sort((a, b) => b.progress - a.progress)
-  const completedProjects = projects.filter(project => project.progress === 100).length
-  const level = completedProjects + 1
-  const xpProgress = (completedProjects % 1) * 100
+  const allProjects = [...projects, ...completedProjects]
+  const sortedProjects = allProjects.sort((a, b) => b.progress - a.progress)
+  const completedProjectsCount = completedProjects.length
+  const level = completedProjectsCount + 1
+  const xpProgress = (completedProjectsCount % 1) * 100
 
   return (
     <Card>
@@ -23,7 +24,7 @@ export function LearningJourney() {
         <div className="mb-4">
           <h3 className="text-lg font-semibold">Level {level}</h3>
           <Progress value={xpProgress} className="mt-2" />
-          <p className="mt-2">{completedProjects} Projects Completed</p>
+          <p className="mt-2">{completedProjectsCount} Projects Completed</p>
         </div>
         <div>
           <h3 className="text-lg font-semibold mb-2">Project Breakdown</h3>

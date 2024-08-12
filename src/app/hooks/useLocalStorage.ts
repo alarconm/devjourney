@@ -14,12 +14,10 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   });
 
-  // eslint-disable-next-line no-unused-vars
   const setValue = (value: T | ((prevValue: T) => T)) => {
     try {
       const valueToStore =
         typeof value === 'function'
-          // eslint-disable-next-line no-unused-vars
           ? (value as (prevValue: T) => T)(storedValue)
           : value;
       setStoredValue(valueToStore);

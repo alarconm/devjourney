@@ -28,7 +28,6 @@
 
 # UI/UX
 - Use Tailwind CSS for styling
-- Implement shadcn/ui components consistently
 - Ensure responsive design for all screen sizes
 - Implement proper accessibility (a11y) practices
 - Use Framer Motion for animations

@@ -4,10 +4,10 @@ import { useAppContext } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { Button } from "@/components/ui/button"
 
 export function CompletedProjects() {
-  const { projects } = useAppContext()
-  const completedProjects = projects.filter(project => project.progress === 100)
+  const { completedProjects, moveCompletedToProject } = useAppContext()
 
   return (
     <Card>
@@ -36,6 +36,12 @@ export function CompletedProjects() {
                   </li>
                 ))}
               </ul>
+              <Button 
+                onClick={() => moveCompletedToProject(project.id)} 
+                className="mt-4"
+              >
+                Move to Current Projects
+              </Button>
             </HoverCardContent>
           </HoverCard>
         ))}

@@ -36,12 +36,17 @@ interface AppContextType {
   moveIdeaToProject: (ideaId: string) => void
   clearAllProjects: () => void
   addIdeaFeature: (ideaId: string, feature: string) => void
+  moveProjectToCompleted: (projectId: string) => void
+  moveCompletedToProject: (projectId: string) => void
+  completedProjects: Project[]
+  updateProjectOrder: () => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', [])
+  const [completedProjects, setCompletedProjects] = useLocalStorage<Project[]>('completedProjects', [])
   const [ideas, setIdeas] = useLocalStorage<Idea[]>('ideas', [])
   const [projectOrder, setProjectOrder] = useLocalStorage<string[]>('projectOrder', [])
   const [ideaOrder, setIdeaOrder] = useLocalStorage<string[]>('ideaOrder', [])
@@ -165,18 +170,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }
 
+  const moveProjectToCompleted = (projectId: string) => {
+    setProjects(prevProjects => {
+      const projectToMove = prevProjects.find(p => p.id === projectId);
+      if (projectToMove) {
+        setCompletedProjects(prev => [...prev, { ...projectToMove, progress: 100 }]);
+        return prevProjects.filter(p => p.id !== projectId);
+      }
+      return prevProjects;
+    });
+    setProjectOrder(prevOrder => prevOrder.filter(id => id !== projectId));
+  }
+
+  const moveCompletedToProject = (projectId: string) => {
+    setCompletedProjects(prev => {
+      const projectToMove = prev.find(p => p.id === projectId);
+      if (projectToMove) {
+        setProjects(prevProjects => [...prevProjects, { ...projectToMove, progress: 99 }]);
+        return prev.filter(p => p.id !== projectId);
+      }
+      return prev;
+    });
+  }
+
   const updateProjectOrder = () => {
-    const currentIds = projects.map(p => p.id);
-    const newOrder = projectOrder.filter(id => currentIds.includes(id));
-    const missingIds = currentIds.filter(id => !newOrder.includes(id));
-    setProjectOrder([...newOrder, ...missingIds]);
+    setProjectOrder(projects.map(p => p.id));
   };
 
-  const updateIdeaOrder = () => {
-    const currentIds = ideas.map(i => i.id);
-    const newOrder = ideaOrder.filter(id => currentIds.includes(id));
-    const missingIds = currentIds.filter(id => !newOrder.includes(id));
-    setIdeaOrder([...newOrder, ...missingIds]);
+  const contextValue = {
+    projects,
+    ideas,
+    projectOrder,
+    ideaOrder,
+    addProject,
+    updateProject,
+    removeProject,
+    addIdea,
+    removeIdea,
+    addProjectFeature,
+    toggleProjectFeature,
+    reorderIdeas,
+    reorderProjects,
+    reorderProjectFeatures,
+    moveIdeaToProject,
+    clearAllProjects,
+    addIdeaFeature,
+    moveProjectToCompleted,
+    moveCompletedToProject,
+    completedProjects,
+    updateProjectOrder
   };
 
   React.useEffect(() => {
@@ -184,29 +226,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [projects]);
 
   React.useEffect(() => {
-    updateIdeaOrder();
+    setIdeaOrder(ideas.map(i => i.id));
   }, [ideas]);
 
   return (
-    <AppContext.Provider value={{
-      projects,
-      ideas,
-      projectOrder,
-      ideaOrder,
-      addProject,
-      updateProject,
-      removeProject,
-      addIdea,
-      removeIdea,
-      addProjectFeature,
-      toggleProjectFeature,
-      reorderIdeas,
-      reorderProjects,
-      reorderProjectFeatures,
-      moveIdeaToProject,
-      clearAllProjects,
-      addIdeaFeature
-    }}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   )
