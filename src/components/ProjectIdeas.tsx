@@ -17,6 +17,14 @@ export function ProjectIdeas() {
   const [newFeature, setNewFeature] = useState('')
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [brainstormingText, setBrainstormingText] = useState('')
+  const [isBrainstormingOpen, setIsBrainstormingOpen] = useState(false)
+
+  const handleBrainstormingSave = () => {
+    // Here you would typically save the brainstorming text to your backend
+    // For now, we'll just close the dialog
+    setIsBrainstormingOpen(false)
+  }
 
   const sortedIdeas = ideaOrder.map(id => ideas.find(i => i.id === id)).filter(Boolean) as Idea[]
 
@@ -58,6 +66,9 @@ export function ProjectIdeas() {
       <CardHeader>
         <CardTitle className="text-primary">Project Ideas</CardTitle>
         <CardDescription>Capture your project ideas</CardDescription>
+        <Button onClick={() => setIsBrainstormingOpen(true)} className="mt-2">
+          Open Brainstorming
+        </Button>
       </CardHeader>
       <CardContent>
         <DragDropContext onDragEnd={onDragEnd}>
@@ -176,6 +187,25 @@ export function ProjectIdeas() {
           </DialogContent>
         </Dialog>
       </CardFooter>
+      <Dialog open={isBrainstormingOpen} onOpenChange={setIsBrainstormingOpen}>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Brainstorming Space</DialogTitle>
+            <DialogDescription>
+              Use this space for open-ended brainstorming and idea dumping.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={brainstormingText}
+            onChange={(e) => setBrainstormingText(e.target.value)}
+            className="h-full min-h-[50vh]"
+            placeholder="Start brainstorming here..."
+          />
+          <DialogFooter>
+            <Button onClick={handleBrainstormingSave}>Save & Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
