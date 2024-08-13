@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, ReactNode, useState } from 'react'
 import { useLocalStorage } from '@/app/hooks/useLocalStorage'
+import { initialSkills } from '@/data/initialSkills'
 
 export interface Project {
   id: string
@@ -9,6 +10,7 @@ export interface Project {
   description: string
   progress: number
   features: { text: string; completed: boolean }[]
+  associatedSkills: string[]
 }
 
 export interface Idea {
@@ -16,6 +18,12 @@ export interface Idea {
   title: string
   description: string
   features: string[]
+}
+
+export interface Skill {
+  id: string
+  name: string
+  level: number
 }
 
 interface AppContextType {
@@ -33,6 +41,7 @@ interface AppContextType {
   reorderIdeas: (startIndex: number, endIndex: number) => void
   reorderProjects: (startIndex: number, endIndex: number) => void
   reorderProjectFeatures: (projectId: string, startIndex: number, endIndex: number) => void
+  reorderIdeaFeatures: (ideaId: string, startIndex: number, endIndex: number) => void
   moveIdeaToProject: (ideaId: string) => void
   clearAllProjects: () => void
   addIdeaFeature: (ideaId: string, feature: string) => void
@@ -40,6 +49,12 @@ interface AppContextType {
   moveCompletedToProject: (projectId: string) => void
   completedProjects: Project[]
   updateProjectOrder: () => void
+  skills: Skill[]
+  addSkill: (skill: Omit<Skill, 'id'>) => void
+  updateSkill: (updatedSkill: Skill) => void
+  removeSkill: (id: string) => void
+  associateSkillWithProject: (projectId: string, skillId: string) => void
+  levelUpSkill: (skillId: string) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -50,6 +65,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ideas, setIdeas] = useLocalStorage<Idea[]>('ideas', [])
   const [projectOrder, setProjectOrder] = useLocalStorage<string[]>('projectOrder', [])
   const [ideaOrder, setIdeaOrder] = useLocalStorage<string[]>('ideaOrder', [])
+  const [skills, setSkills] = useLocalStorage<Skill[]>('skills', initialSkills.map((skill, index) => ({ ...skill, id: `skill-${index + 1}` })))
 
   const addProject = (project: Omit<Project, 'id' | 'progress' | 'features'>) => {
     const newProject: Project = {
@@ -194,7 +210,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjects(prevProjects => {
       const projectToMove = prevProjects.find(p => p.id === projectId);
       if (projectToMove) {
-        setCompletedProjects(prev => [...prev, { ...projectToMove, progress: 100 }]);
+        setCompletedProjects(prev => [...prev, { ...projectToMove, progress: 100, associatedSkills: projectToMove.associatedSkills || [] }]);
+
+        // Level up associated skills
+        setSkills(prevSkills =>
+          prevSkills.map(skill =>
+            projectToMove.associatedSkills.includes(skill.id)
+              ? { ...skill, level: skill.level + 1 }
+              : skill
+          )
+        );
+
         return prevProjects.filter(p => p.id !== projectId);
       }
       return prevProjects;
@@ -226,6 +252,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const addSkill = (skill: Omit<Skill, 'id'>) => {
+    const newSkill: Skill = {
+      ...skill,
+      id: Date.now().toString(),
+      level: 1
+    }
+    setSkills(prevSkills => [...prevSkills, newSkill])
+  }
+
+  const updateSkill = (updatedSkill: Skill) => {
+    setSkills(prevSkills =>
+      prevSkills.map(skill => (skill.id === updatedSkill.id ? updatedSkill : skill))
+    )
+  }
+
+  const removeSkill = (id: string) => {
+    setSkills(prevSkills => prevSkills.filter(skill => skill.id !== id))
+  }
+
+  const associateSkillWithProject = (projectId: string, skillId: string) => {
+    setProjects(prevProjects =>
+      prevProjects.map(project =>
+        project.id === projectId
+          ? { ...project, associatedSkills: [...(project.associatedSkills || []), skillId] }
+          : project
+      )
+    )
+  }
+
+  const levelUpSkill = (skillId: string) => {
+    setSkills(prevSkills =>
+      prevSkills.map(skill =>
+        skill.id === skillId ? { ...skill, level: skill.level + 1 } : skill
+      )
+    )
+  }
+
   const contextValue = {
     projects,
     ideas,
@@ -248,7 +311,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     moveProjectToCompleted,
     moveCompletedToProject,
     completedProjects,
-    updateProjectOrder
+    updateProjectOrder,
+    skills,
+    addSkill,
+    updateSkill,
+    removeSkill,
+    associateSkillWithProject,
+    levelUpSkill
   };
 
   React.useEffect(() => {

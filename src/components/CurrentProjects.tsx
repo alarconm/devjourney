@@ -10,9 +10,11 @@ import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { SkillSelector } from './SkillSelector'
+import { Badge } from "@/components/ui/badge"
 
 export function CurrentProjects() {
-  const { projects, projectOrder, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects, moveProjectToCompleted } = useAppContext()
+  const { projects, projectOrder, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects, moveProjectToCompleted, skills } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
@@ -54,6 +56,17 @@ export function CurrentProjects() {
       }
     }
   };
+
+  const handleSkillSelect = (projectId: string, skillId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      const updatedProject = {
+        ...project,
+        associatedSkills: [...(project.associatedSkills || []), skillId]
+      }
+      updateProject(updatedProject)
+    }
+  }
 
   return (
     <Card>
@@ -129,6 +142,21 @@ export function CurrentProjects() {
                                     addProjectFeature(project.id, newFeature)
                                     setNewFeature('')
                                   }}>Add</Button>
+                                </div>
+                                <div className="mt-4">
+                                  <h4 className="text-sm font-semibold mb-2">Associated Skills</h4>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {project.associatedSkills && project.associatedSkills.map((skillId) => {
+                                      const skill = skills.find(s => s.id === skillId)
+                                      return skill ? (
+                                        <Badge key={skillId}>{skill.name}</Badge>
+                                      ) : null
+                                    })}
+                                  </div>
+                                  <SkillSelector
+                                    selectedSkills={project.associatedSkills || []}
+                                    onSkillSelect={(skillId) => handleSkillSelect(project.id, skillId)}
+                                  />
                                 </div>
                               </div>
                             )}

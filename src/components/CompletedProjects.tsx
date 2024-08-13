@@ -7,7 +7,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Button } from "@/components/ui/button"
 
 export function CompletedProjects() {
-  const { completedProjects, moveCompletedToProject } = useAppContext()
+  const { completedProjects, moveCompletedToProject, skills } = useAppContext()
 
   return (
     <Card>
@@ -36,6 +36,17 @@ export function CompletedProjects() {
                   </li>
                 ))}
               </ul>
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold mb-2">Skills Used</h4>
+                <div className="flex flex-wrap gap-2">
+                  {project.associatedSkills && project.associatedSkills.map((skillId) => {
+                    const skill = skills.find(s => s.id === skillId)
+                    return skill ? (
+                      <Badge key={skillId}>{skill.name}</Badge>
+                    ) : null
+                  })}
+                </div>
+              </div>
               <Button 
                 onClick={() => moveCompletedToProject(project.id)} 
                 className="mt-4"

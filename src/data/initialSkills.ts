@@ -1,0 +1,17 @@
+export const initialSkills = [
+  { name: 'JavaScript', level: 0 },
+  { name: 'React', level: 0 },
+  { name: 'Node.js', level: 0 },
+  { name: 'Python', level: 0 },
+  { name: 'Java', level: 0 },
+  { name: 'C#', level: 0 },
+  { name: 'SQL', level: 0 },
+  { name: 'HTML', level: 0 },
+  { name: 'CSS', level: 0 },
+  { name: 'Git', level: 0 },
+  { name: 'Docker', level: 0 },
+  { name: 'AWS', level: 0 },
+  { name: 'TypeScript', level: 0 },
+  { name: 'GraphQL', level: 0 },
+  { name: 'Redux', level: 0 },
+];
