@@ -14,7 +14,7 @@ import { SkillSelector } from './SkillSelector'
 import { Badge } from "@/components/ui/badge"
 
 export function CurrentProjects() {
-  const { projects, projectOrder, updateProject, removeProject, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects, moveProjectToCompleted, skills } = useAppContext()
+  const { projects, projectOrder, updateProject, moveProjectToIdea, addProjectFeature, toggleProjectFeature, reorderProjects, reorderProjectFeatures, clearAllProjects, moveProjectToCompleted, skills } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
@@ -23,7 +23,18 @@ export function CurrentProjects() {
     .filter(Boolean) as Project[]
 
   const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return
+    if (!result.destination) {
+      // Item was dragged outside of any droppable area
+      if (result.type === 'feature') {
+        const [projectId, featureIndex] = result.draggableId.split('-')
+        const project = projects.find(p => p.id === projectId)
+        if (project) {
+          const updatedFeatures = project.features.filter((_, index) => index !== parseInt(featureIndex))
+          updateProject({ ...project, features: updatedFeatures })
+        }
+      }
+      return
+    }
 
     const sourceIndex = result.source.index
     const destinationIndex = result.destination.index
@@ -97,23 +108,59 @@ export function CurrentProjects() {
                             <CardDescription>{project.description}</CardDescription>
                           </CardHeader>
                           <CardContent>
-                            <Progress value={project.progress} className="mb-2" />
-                            <Button onClick={() => toggleExpand(project.id)}>
-                              {expandedProjectId === project.id ? 'Hide Features' : 'Show Features'}
-                            </Button>
+                            <div className="flex items-center mb-2">
+                              <Progress value={project.progress} className="flex-grow mr-2" />
+                              <span className="text-sm text-muted-foreground">{Math.round(project.progress)}%</span>
+                            </div>
+                            {project.features && project.features.find(f => !f.completed) && (
+                              <div className="text-sm text-muted-foreground mb-2 p-2 bg-secondary rounded">
+                                <p className="font-semibold">Next Feature:</p>
+                                <p className="mt-1">{project.features.find(f => !f.completed)?.text}</p>
+                              </div>
+                            )}
+                            <div className="flex space-x-2">
+                              <Button onClick={() => toggleExpand(project.id)}>
+                                {expandedProjectId === project.id ? 'Hide Details' : 'Show Details'}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="secondary">
+                                    Move to Ideas
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Move to Ideas?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to move this project back to ideas? This will reset its progress.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => moveProjectToIdea(project.id)}>
+                                      Move to Ideas
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                             {expandedProjectId === project.id && (
                               <div className="mt-2">
-                                <Droppable droppableId={`features-${project.id}`} type="feature">
-                                  {(provided) => (
-                                    <ul {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                <Droppable droppableId={`features-${project.id}`} type="feature" direction="vertical">
+                                  {(provided, snapshot) => (
+                                    <ul
+                                      {...provided.droppableProps}
+                                      ref={provided.innerRef}
+                                      className={`space-y-2 min-h-[100px] ${snapshot.isDraggingOver ? 'bg-secondary/50' : ''}`}
+                                    >
                                       {project.features && project.features.map((feature, featureIndex) => (
                                         <Draggable key={`${project.id}-${featureIndex}`} draggableId={`${project.id}-${featureIndex}`} index={featureIndex}>
-                                          {(provided) => (
+                                          {(provided, snapshot) => (
                                             <li
                                               ref={provided.innerRef}
                                               {...provided.draggableProps}
                                               {...provided.dragHandleProps}
-                                              className="flex items-center bg-secondary p-2 rounded"
+                                              className={`flex items-center bg-secondary p-2 rounded ${snapshot.isDragging ? 'opacity-50' : ''}`}
                                             >
                                               <Checkbox
                                                 checked={feature.completed}
@@ -161,27 +208,6 @@ export function CurrentProjects() {
                               </div>
                             )}
                           </CardContent>
-                          <CardFooter>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive">Remove</Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the project.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => removeProject(project.id)}>
-                                    Remove
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </CardFooter>
                         </Card>
                       </div>
                     )}

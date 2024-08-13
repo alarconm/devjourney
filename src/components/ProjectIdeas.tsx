@@ -80,7 +80,7 @@ export function ProjectIdeas() {
                           </CardHeader>
                           <CardContent>
                             <Button onClick={() => toggleExpand(idea.id)}>
-                              {expandedIdeaId === idea.id ? 'Hide Features' : 'Show Features'}
+                              {expandedIdeaId === idea.id ? 'Hide Details' : 'Show Details'}
                             </Button>
                             {expandedIdeaId === idea.id && (
                               <div className="mt-2">

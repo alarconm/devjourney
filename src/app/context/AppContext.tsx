@@ -55,6 +55,7 @@ interface AppContextType {
   removeSkill: (id: string) => void
   associateSkillWithProject: (projectId: string, skillId: string) => void
   levelUpSkill: (skillId: string) => void
+  moveProjectToIdea: (projectId: string) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -291,6 +292,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  const moveProjectToIdea = (projectId: string) => {
+    setProjects(prevProjects => {
+      const projectToMove = prevProjects.find(p => p.id === projectId);
+      if (projectToMove) {
+        const newIdea: Idea = {
+          id: projectToMove.id,
+          title: projectToMove.title,
+          description: projectToMove.description,
+          features: projectToMove.features.map(f => f.text)
+        };
+        setIdeas(prevIdeas => [...prevIdeas, newIdea]);
+        setIdeaOrder(prevOrder => [...prevOrder, newIdea.id]);
+        return prevProjects.filter(p => p.id !== projectId);
+      }
+      return prevProjects;
+    });
+    setProjectOrder(prevOrder => prevOrder.filter(id => id !== projectId));
+  };
+
   const contextValue = {
     projects,
     ideas,
@@ -319,7 +339,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateSkill,
     removeSkill,
     associateSkillWithProject,
-    levelUpSkill
+    levelUpSkill,
+    moveProjectToIdea
   };
 
   React.useEffect(() => {
