@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Input } from "@/components/ui/input"

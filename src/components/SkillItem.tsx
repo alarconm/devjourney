@@ -1,3 +1,5 @@
+"use client"
+
 import React from 'react'
 import { Skill } from '@/app/context/AppContext'
 import { Progress } from "@/components/ui/progress"

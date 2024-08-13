@@ -1,3 +1,5 @@
+"use client"
+
 import React from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

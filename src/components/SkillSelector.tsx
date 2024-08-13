@@ -1,3 +1,5 @@
+"use client"
+
 import React from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
