@@ -186,10 +186,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         title: idea.title,
         description: idea.description,
         progress: 0,
-        features: idea.features ? idea.features.map(m => ({ text: m, completed: false })) : []
+        features: idea.features.map(text => ({ text, completed: false })),
+        associatedSkills: []
       }
-      setProjects([...projects, newProject])
-      setIdeas(ideas.filter(i => i.id !== ideaId))
+      setProjects(prevProjects => [...prevProjects, newProject])
+      setProjectOrder(prevOrder => [...prevOrder, newProject.id])
+      removeIdea(ideaId)
     }
   }
 
