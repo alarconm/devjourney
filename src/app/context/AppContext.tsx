@@ -24,7 +24,7 @@ interface AppContextType {
   projectOrder: string[]
   ideaOrder: string[]
   addProject: (project: Omit<Project, 'id' | 'progress' | 'features'>) => void
-  updateProject: (project: Project) => void
+  updateProject: (updatedProject: Project) => void
   removeProject: (id: string) => void
   addIdea: (idea: Omit<Idea, 'id'>) => void
   removeIdea: (id: string) => void
@@ -63,7 +63,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const updateProject = (updatedProject: Project) => {
-    setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p))
+    setProjects(prevProjects => {
+      const index = prevProjects.findIndex(p => p.id === updatedProject.id);
+      if (index !== -1) {
+        const newProjects = [...prevProjects];
+        newProjects[index] = updatedProject;
+        return newProjects;
+      }
+      return prevProjects;
+    });
   }
 
   const removeProject = (id: string) => {
@@ -209,6 +217,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectOrder(projects.map(p => p.id));
   };
 
+  const ensureProjectOrder = () => {
+    setProjectOrder(prevOrder => {
+      const currentIds = projects.map(p => p.id);
+      const newOrder = prevOrder.filter(id => currentIds.includes(id));
+      const missingIds = currentIds.filter(id => !newOrder.includes(id));
+      return [...newOrder, ...missingIds];
+    });
+  };
+
   const contextValue = {
     projects,
     ideas,
@@ -235,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   React.useEffect(() => {
-    updateProjectOrder();
+    ensureProjectOrder();
   }, [projects]);
 
   React.useEffect(() => {

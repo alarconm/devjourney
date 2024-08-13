@@ -16,6 +16,7 @@ export function ProjectIdeas() {
   const [newIdea, setNewIdea] = useState({ title: '', description: '', features: [] })
   const [newFeature, setNewFeature] = useState('')
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   const sortedIdeas = ideaOrder.map(id => ideas.find(i => i.id === id)).filter(Boolean) as Idea[]
 
@@ -41,6 +42,7 @@ export function ProjectIdeas() {
     if (newIdea.title && newIdea.description) {
       addIdea({ ...newIdea, features: [] })
       setNewIdea({ title: '', description: '', features: [] })
+      setIsDialogOpen(false)
     }
   }
 
@@ -149,9 +151,9 @@ export function ProjectIdeas() {
         </DragDropContext>
       </CardContent>
       <CardFooter>
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full">Add New Idea</Button>
+            <Button className="w-full" onClick={() => setIsDialogOpen(true)}>Add New Idea</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
