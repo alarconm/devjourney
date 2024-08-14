@@ -8,11 +8,21 @@ import { Badge } from "@/components/ui/badge"
 export function LearningJourney() {
   const { projects, completedProjects, skills } = useAppContext()
 
-  const allProjects = [...projects, ...completedProjects]
-  const sortedProjects = allProjects.sort((a, b) => b.progress - a.progress)
   const completedProjectsCount = completedProjects.length
   const level = completedProjectsCount + 1
-  const xpProgress = (completedProjectsCount % 1) * 100
+
+  // Sort projects by progress in descending order
+  const sortedProjects = [...projects].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0))
+
+  // Calculate XP progress based on current projects' completion
+  const totalFeatures = sortedProjects.reduce((sum, project) => sum + project.features.length, 0)
+  const completedFeatures = sortedProjects.reduce((sum, project) => sum + project.features.filter(f => f.completed).length, 0)
+  let xpProgress = totalFeatures > 0 ? (completedFeatures / totalFeatures) * 100 : 0
+
+  // Cap the progress at 99% if it would push to the next level
+  if (xpProgress >= 100 && completedProjectsCount === level - 1) {
+    xpProgress = 99
+  }
 
   const gainedSkills = skills.filter(skill => skill.level > 0);
 
@@ -30,7 +40,7 @@ export function LearningJourney() {
         </div>
         <Card className="mb-4">
           <CardHeader>
-            <CardTitle className="text-primary">Project Breakdown</CardTitle>
+            <CardTitle className="text-primary">Current Progress</CardTitle>
           </CardHeader>
           <CardContent>
             {sortedProjects.map((project) => (
