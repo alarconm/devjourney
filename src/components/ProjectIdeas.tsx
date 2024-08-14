@@ -19,10 +19,14 @@ export function ProjectIdeas() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [brainstormingText, setBrainstormingText] = useState('')
   const [isBrainstormingOpen, setIsBrainstormingOpen] = useState(false)
+  const [archivedNotes, setArchivedNotes] = useState<Array<{ text: string, timestamp: string }>>([])
 
   const handleBrainstormingSave = () => {
-    // Here you would typically save the brainstorming text to your backend
-    // For now, we'll just close the dialog
+    if (brainstormingText.trim()) {
+      const timestamp = new Date().toLocaleString()
+      setArchivedNotes(prev => [...prev, { text: brainstormingText, timestamp }])
+      setBrainstormingText('')
+    }
     setIsBrainstormingOpen(false)
   }
 
@@ -197,12 +201,23 @@ export function ProjectIdeas() {
               Use this space for open-ended brainstorming and idea dumping.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            value={brainstormingText}
-            onChange={(e) => setBrainstormingText(e.target.value)}
-            className="h-full min-h-[50vh]"
-            placeholder="Start brainstorming here..."
-          />
+          <div className="flex flex-col h-full">
+            <Textarea
+              value={brainstormingText}
+              onChange={(e) => setBrainstormingText(e.target.value)}
+              className="flex-grow min-h-[30vh] mb-4"
+              placeholder="Start brainstorming here..."
+            />
+            <div className="overflow-y-auto max-h-[30vh] mb-4">
+              <h3 className="text-lg font-semibold mb-2">Archived Notes</h3>
+              {archivedNotes.map((note, index) => (
+                <div key={index} className="bg-secondary/10 p-2 rounded mb-2">
+                  <p className="text-sm text-muted-foreground mb-1">{note.timestamp}</p>
+                  <p>{note.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
           <DialogFooter>
             <Button onClick={handleBrainstormingSave}>Save & Close</Button>
           </DialogFooter>

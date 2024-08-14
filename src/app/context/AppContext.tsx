@@ -31,11 +31,13 @@ interface AppContextType {
   ideas: Idea[]
   projectOrder: string[]
   ideaOrder: string[]
+  learningJourneyOrder: string[];
   addProject: (project: Omit<Project, 'id' | 'progress' | 'features'>) => void
   updateProject: (updatedProject: Project) => void
   removeProject: (id: string) => void
   addIdea: (idea: Omit<Idea, 'id'>) => void
   removeIdea: (id: string) => void
+  reorderLearningJourney: (startIndex: number, endIndex: number) => void;
   addProjectFeature: (projectId: string, feature: string) => void
   toggleProjectFeature: (projectId: string, featureIndex: number) => void
   reorderIdeas: (startIndex: number, endIndex: number) => void
@@ -67,7 +69,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ideas, setIdeas] = useLocalStorage<Idea[]>('ideas', [])
   const [projectOrder, setProjectOrder] = useLocalStorage<string[]>('projectOrder', [])
   const [ideaOrder, setIdeaOrder] = useLocalStorage<string[]>('ideaOrder', [])
+  const [learningJourneyOrder, setLearningJourneyOrder] = useLocalStorage<string[]>('learningJourneyOrder', [])
   const [skills, setSkills] = useLocalStorage<Skill[]>('skills', initialSkills.map((skill, index) => ({ ...skill, id: `skill-${index + 1}` })))
+
+  // Initialize learningJourneyOrder if it's empty
+  React.useEffect(() => {
+    if (learningJourneyOrder.length === 0) {
+      const allProjectIds = [...projects, ...completedProjects].map(p => p.id)
+      setLearningJourneyOrder(allProjectIds)
+    }
+  }, [projects, completedProjects, learningJourneyOrder])
 
   const addProject = (project: Omit<Project, 'id' | 'progress' | 'features'>) => {
     const newProject: Project = {
@@ -180,6 +191,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }
 
+  const reorderLearningJourney = (startIndex: number, endIndex: number) => {
+    setLearningJourneyOrder(prevOrder => {
+      const result = Array.from(prevOrder);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return result;
+    });
+  };
+
   const moveIdeaToProject = (ideaId: string) => {
     const idea = ideas.find(i => i.id === ideaId)
     if (idea) {
@@ -233,12 +253,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const projectToMove = prev.find(p => p.id === projectId);
       if (projectToMove) {
         setProjects(prevProjects => [...prevProjects, { ...projectToMove, progress: 99 }]);
-
+        
         // Remove skill levels gained from this project
         if (projectToMove.associatedSkills) {
           adjustSkillLevels(projectToMove.associatedSkills, false);
         }
-
+        
         return prev.filter(p => p.id !== projectId);
       }
       return prev;
