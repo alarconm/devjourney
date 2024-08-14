@@ -56,6 +56,7 @@ interface AppContextType {
   associateSkillWithProject: (projectId: string, skillId: string) => void
   levelUpSkill: (skillId: string) => void
   moveProjectToIdea: (projectId: string) => void
+  adjustSkillLevels: (projectSkills: string[], increment: boolean) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -216,13 +217,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCompletedProjects(prev => [...prev, { ...projectToMove, progress: 100, associatedSkills: projectToMove.associatedSkills || [] }]);
 
         // Level up associated skills
-        setSkills(prevSkills =>
-          prevSkills.map(skill =>
-            projectToMove.associatedSkills.includes(skill.id)
-              ? { ...skill, level: skill.level + 1 }
-              : skill
-          )
-        );
+        if (projectToMove.associatedSkills) {
+          adjustSkillLevels(projectToMove.associatedSkills, true);
+        }
 
         return prevProjects.filter(p => p.id !== projectId);
       }
@@ -236,6 +233,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const projectToMove = prev.find(p => p.id === projectId);
       if (projectToMove) {
         setProjects(prevProjects => [...prevProjects, { ...projectToMove, progress: 99 }]);
+
+        // Remove skill levels gained from this project
+        if (projectToMove.associatedSkills) {
+          adjustSkillLevels(projectToMove.associatedSkills, false);
+        }
+
         return prev.filter(p => p.id !== projectId);
       }
       return prev;
@@ -311,6 +314,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectOrder(prevOrder => prevOrder.filter(id => id !== projectId));
   };
 
+  const adjustSkillLevels = (projectSkills: string[], increment: boolean) => {
+    setSkills(prevSkills =>
+      prevSkills.map(skill =>
+        projectSkills.includes(skill.id)
+          ? { ...skill, level: increment ? skill.level + 1 : Math.max(0, skill.level - 1) }
+          : skill
+      )
+    );
+  };
+
   const contextValue = {
     projects,
     ideas,
@@ -340,7 +353,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeSkill,
     associateSkillWithProject,
     levelUpSkill,
-    moveProjectToIdea
+    moveProjectToIdea,
+    adjustSkillLevels
   };
 
   React.useEffect(() => {
