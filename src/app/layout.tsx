@@ -4,8 +4,9 @@ import { Inter } from "next/font/google";
 import './globals.css';
 import { AppProvider } from './context/AppContext'
 import { ThemeProvider } from "@/components/theme-provider"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ColorPaletteToggle } from "@/components/ColorPaletteToggle"
 import ClientOnly from '@/components/ClientOnly'
+import { ColorPaletteProvider } from './context/ColorPaletteContext'
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,26 +17,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ColorPaletteProvider>
           <AppProvider>
-            <div className="flex justify-end p-4">
-              <ThemeToggle />
-            </div>
-            <ClientOnly>{children}</ClientOnly>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+              {children}
+            </ThemeProvider>
           </AppProvider>
-        </ThemeProvider>
+        </ColorPaletteProvider>
       </body>
     </html>
-  );
+  )
 }

@@ -12,7 +12,7 @@ export function CompletedProjects() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Completed Projects</CardTitle>
+        <CardTitle className="text-primary">Completed Projects</CardTitle>
         <CardDescription>Showcase your achievements</CardDescription>
       </CardHeader>
       <CardContent>

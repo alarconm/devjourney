@@ -90,9 +90,12 @@ export function ProjectIdeas() {
                             <CardDescription>{idea.description}</CardDescription>
                           </CardHeader>
                           <CardContent>
-                            <Button onClick={() => toggleExpand(idea.id)}>
-                              {expandedIdeaId === idea.id ? 'Hide Details' : 'Show Details'}
-                            </Button>
+                            <div className="flex space-x-2">
+                              <Button onClick={() => toggleExpand(idea.id)}>
+                                {expandedIdeaId === idea.id ? 'Hide Details' : 'Show Details'}
+                              </Button>
+                              <Button variant="gradient" onClick={() => moveIdeaToProject(idea.id)}>Start Project</Button>
+                            </div>
                             {expandedIdeaId === idea.id && (
                               <div className="mt-2">
                                 <Droppable droppableId={`features-${idea.id}`} type="feature">
@@ -105,7 +108,7 @@ export function ProjectIdeas() {
                                               ref={provided.innerRef}
                                               {...provided.draggableProps}
                                               {...provided.dragHandleProps}
-                                              className="flex items-center bg-secondary p-2 rounded"
+                                              className="flex items-center bg-secondary/10 p-2 rounded"
                                             >
                                               <span>{feature}</span>
                                             </li>
@@ -125,31 +128,30 @@ export function ProjectIdeas() {
                                   />
                                   <Button onClick={() => handleAddFeature(idea.id)}>Add</Button>
                                 </div>
+                                <div className="mt-4">
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="destructive">Remove</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This action cannot be undone. This will permanently delete the idea.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => removeIdea(idea.id)}>
+                                          Remove
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </div>
                             )}
                           </CardContent>
-                          <CardFooter>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive">Remove</Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the idea.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => removeIdea(idea.id)}>
-                                    Remove
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                            <Button onClick={() => moveIdeaToProject(idea.id)} className="ml-2">Start Project</Button>
-                          </CardFooter>
                         </Card>
                       </div>
                     )}

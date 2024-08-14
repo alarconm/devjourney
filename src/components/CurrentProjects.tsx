@@ -112,19 +112,21 @@ export function CurrentProjects() {
                               <Progress value={project.progress} className="flex-grow mr-2" />
                               <span className="text-sm text-muted-foreground">{Math.round(project.progress)}%</span>
                             </div>
-                            {project.features && project.features.find(f => !f.completed) && (
-                              <div className="text-sm text-muted-foreground mb-2 p-2 bg-secondary rounded">
-                                <p className="font-semibold">Next Feature:</p>
-                                <p className="mt-1">{project.features.find(f => !f.completed)?.text}</p>
-                              </div>
-                            )}
+                            <div className="text-sm text-foreground mb-2">
+                              <p className="font-semibold mb-1">Next Feature to Implement:</p>
+                              {project.features && project.features.find(f => !f.completed) && (
+                                <div className="p-2 bg-secondary/10 rounded">
+                                  <p>{project.features.find(f => !f.completed)?.text}</p>
+                                </div>
+                              )}
+                            </div>
                             <div className="flex space-x-2">
                               <Button onClick={() => toggleExpand(project.id)}>
                                 {expandedProjectId === project.id ? 'Hide Details' : 'Show Details'}
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button variant="secondary">
+                                  <Button variant="gradient">
                                     Move to Ideas
                                   </Button>
                                 </AlertDialogTrigger>
@@ -160,7 +162,7 @@ export function CurrentProjects() {
                                               ref={provided.innerRef}
                                               {...provided.draggableProps}
                                               {...provided.dragHandleProps}
-                                              className={`flex items-center bg-secondary p-2 rounded ${snapshot.isDragging ? 'opacity-50' : ''}`}
+                                              className={`flex items-center bg-secondary/10 p-2 rounded ${snapshot.isDragging ? 'opacity-50' : ''}`}
                                             >
                                               <Checkbox
                                                 checked={feature.completed}
