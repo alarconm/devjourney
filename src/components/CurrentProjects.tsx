@@ -13,177 +13,115 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { SkillSelector } from './SkillSelector'
 import { Badge } from "@/components/ui/badge"
 import { supabase } from '@/lib/supabase'
+import { RealtimeChannel } from '@supabase/supabase-js'
 
 export function CurrentProjects() {
-  const { fetchProjects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills, moveProjectToIdea, moveIdeaToProject } = useAppContext()
-  const [projects, setProjects] = useState<Project[]>([])
+  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills, moveProjectToIdea, moveIdeaToProject, refreshCurrentProjects, setProjects, handleSkillSelect } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
-  const [projectOrder, setProjectOrder] = useState<string[]>([])
-  const [projectFeatures, setProjectFeatures] = useState<{[key: string]: {id: string, text: string, completed: boolean}[]}>({})
-
-  useEffect(() => {
-    fetchProjectsFromDB()
-  }, [])
-
-  const fetchProjectsFromDB = async () => {
-    const { data: projectsData, error: projectsError } = await supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .neq('status', 'completed')
-
-    if (projectsError) {
-      console.error('Error fetching projects:', projectsError)
-      return
-    }
-
-    const { data: featuresData, error: featuresError } = await supabase
-      .from('project_features')
-      .select('*')
-
-    if (featuresError) {
-      console.error('Error fetching project features:', featuresError)
-      return
-    }
-
-    const projectsWithFeatures = projectsData.map(project => ({
-      ...project,
-      features: featuresData.filter(feature => feature.project_id === project.id)
-    }))
-
-    setProjects(projectsWithFeatures)
-  }
-
-  const fetchProjectOrder = async () => {
-    const { data, error } = await supabase
-      .from('project_order')
-      .select('*')
-      .order('order', { ascending: true })
-    if (error) console.error('Error fetching project order:', error)
-    else setProjectOrder(data.map(item => item.project_id))
-  }
-
-  const fetchProjectFeatures = async () => {
-    const { data, error } = await supabase
-      .from('project_features')
-      .select('*')
-    if (error) console.error('Error fetching project features:', error)
-    else {
-      const features = data.reduce((acc, feature) => {
-        if (!acc[feature.project_id]) acc[feature.project_id] = []
-        acc[feature.project_id].push(feature)
-        return acc
-      }, {} as {[key: string]: {id: string, text: string, completed: boolean}[]})
-      setProjectFeatures(features)
-    }
-  }
-
-  const sortedProjects = projectOrder.length > 0
-    ? projectOrder
-        .map(id => projects.find(p => p.id === id))
-        .filter(Boolean) as Project[]
-    : projects
-
-  const onDragEnd = async (result: DropResult) => {
-    if (!result.destination) return
-
-    const sourceIndex = result.source.index
-    const destinationIndex = result.destination.index
-
-    if (result.type === 'project') {
-      const newOrder = Array.from(projectOrder)
-      const [removed] = newOrder.splice(sourceIndex, 1)
-      newOrder.splice(destinationIndex, 0, removed)
-
-      setProjectOrder(newOrder)
-
-      // Update the order in the database
-      const updates = newOrder.map((id, index) => ({
-        project_id: id,
-        order: index
-      }))
-
-      const { error } = await supabase
-        .from('project_order')
-        .upsert(updates, { onConflict: 'project_id' })
-
-      if (error) console.error('Error updating project order:', error)
-    } else if (result.type === 'feature') {
-      const projectId = result.draggableId.split('-')[0]
-      const newFeatures = Array.from(projectFeatures[projectId])
-      const [removed] = newFeatures.splice(sourceIndex, 1)
-      newFeatures.splice(destinationIndex, 0, removed)
-
-      setProjectFeatures({...projectFeatures, [projectId]: newFeatures})
-
-      // Update the order in the database
-      const updates = newFeatures.map((feature, index) => ({
-        id: feature.id,
-        order: index
-      }))
-
-      const { error } = await supabase
-        .from('project_features')
-        .upsert(updates, { onConflict: 'id' })
-
-      if (error) console.error('Error updating feature order:', error)
-    }
-  }
 
   const toggleExpand = (projectId: string) => {
-    setExpandedProjectId(expandedProjectId === projectId ? null : projectId)
-  }
+    setExpandedProjectId(prevId => prevId === projectId ? null : projectId);
+  };
+
+  const handleToggleProjectFeature = async (projectId: string, featureId: string) => {
+    await toggleProjectFeature(projectId, featureId);
+    setProjects(prevProjects => prevProjects.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          project_features: p.project_features?.map(f => 
+            f.id === featureId ? { ...f, completed: !f.completed } : f
+          )
+        };
+      }
+      return p;
+    }));
+  };
+
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) {
+      // Feature was dragged outside the list
+      if (result.type === 'feature') {
+        const [projectId, featureId] = result.draggableId.split('-');
+        await handleRemoveFeature(projectId, featureId);
+      }
+      return;
+    }
+
+    const sourceIndex = result.source.index;
+    const destIndex = result.destination.index;
+    const projectId = result.source.droppableId.split('-')[1];
+
+    if (result.type === 'feature') {
+      setProjects((prevProjects: Project[]) => prevProjects.map((p: Project) => {
+        if (p.id === projectId) {
+          const newFeatures = Array.from(p.project_features || []);
+          const [reorderedItem] = newFeatures.splice(sourceIndex, 1);
+          newFeatures.splice(destIndex, 0, reorderedItem);
+          return { ...p, project_features: newFeatures };
+        }
+        return p;
+      }));
+
+      const projectToUpdate = projects.find(p => p.id === projectId);
+      if (projectToUpdate) {
+        const updatedFeatures = projectToUpdate.project_features?.map((feature, index) => ({
+          ...feature,
+          order: index
+        }));
+        await updateProject({ ...projectToUpdate, project_features: updatedFeatures });
+      } else {
+        console.error('Project not found for update');
+      }
+    }
+  };
+
+  const handleRemoveFeature = async (projectId: string, featureId: string) => {
+    const { error } = await supabase
+      .from('project_features')
+      .delete()
+      .eq('id', featureId);
+
+    if (error) {
+      console.error('Error removing feature:', error);
+    } else {
+      setProjects((prevProjects: Project[]) => prevProjects.map((p: Project) => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            project_features: p.project_features?.filter((f: { id: string }) => f.id !== featureId)
+          };
+        }
+        return p;
+      }));
+    }
+  };
 
   const handleAddFeature = async (projectId: string) => {
     if (newFeature.trim()) {
-      await addProjectFeature(projectId, newFeature)
+      await addProjectFeature(projectId, newFeature.trim())
       setNewFeature('')
-      await fetchProjectFeatures()
     }
   }
 
-  const checkAndMoveCompletedProject = async (projectId: string, featureId: string) => {
-    await toggleProjectFeature(projectId, featureId)
-    await fetchProjectFeatures()
+  useEffect(() => {
+    const projectsChannel = supabase.channel('projects-changes');
+    const featuresChannel = supabase.channel('features-changes');
 
-    const project = projects.find(p => p.id === projectId)
-    if (project) {
-      const updatedFeatures = projectFeatures[projectId]
-      const completedFeatures = updatedFeatures.filter(f => f.completed).length
-      const progress = (completedFeatures / updatedFeatures.length) * 100
+    projectsChannel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, refreshCurrentProjects)
+      .subscribe();
 
-      if (progress === 100) {
-        await updateProject({ ...project, progress, status: 'completed' })
-      } else {
-        await updateProject({ ...project, progress })
-      }
+    featuresChannel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_features' }, refreshCurrentProjects)
+      .subscribe();
+
+    return () => {
+      projectsChannel.unsubscribe();
+      featuresChannel.unsubscribe();
     }
-  }
-
-  const handleSkillSelect = async (projectId: string, skillId: string) => {
-    const { error } = await supabase
-      .from('project_skills')
-      .insert({ project_id: projectId, skill_id: skillId })
-    
-    if (error) console.error('Error associating skill with project:', error)
-    else {
-      const project = projects.find(p => p.id === projectId)
-      if (project) {
-        const updatedProject = {
-          ...project,
-          associatedSkills: [...(project.associatedSkills || []), skillId]
-        }
-        await updateProject(updatedProject)
-      }
-    }
-  }
-
-  const handleRemoveProject = async (projectId: string) => {
-    await removeProject(projectId)
-    setProjects(projects.filter(p => p.id !== projectId))
-    await fetchProjectOrder()
-  }
+  }, [refreshCurrentProjects])
 
   return (
     <Card>
@@ -196,7 +134,7 @@ export function CurrentProjects() {
           <Droppable droppableId="currentProjects" type="project">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {sortedProjects.map((project, index) => (
+                {projects.map((project, index) => (
                   <Draggable key={project.id} draggableId={project.id} index={index}>
                     {(provided) => (
                       <div
@@ -217,9 +155,9 @@ export function CurrentProjects() {
                             </div>
                             <div className="text-sm text-foreground mb-2">
                               <p className="font-semibold mb-1">Next Feature to Implement:</p>
-                              {projectFeatures[project.id] && projectFeatures[project.id].find(f => !f.completed) && (
+                              {project.project_features && project.project_features.find(f => !f.completed) && (
                                 <div className="p-2 bg-secondary/10 rounded">
-                                  <p>{projectFeatures[project.id].find(f => !f.completed)?.text}</p>
+                                  <p>{project.project_features.find(f => !f.completed)?.text}</p>
                                 </div>
                               )}
                             </div>
@@ -251,15 +189,15 @@ export function CurrentProjects() {
                             </div>
                             {expandedProjectId === project.id && (
                               <div className="mt-2">
-                                <Droppable droppableId={`features-${project.id}`} type="feature" direction="vertical">
+                                <Droppable droppableId={`features-${project.id}`} type="feature">
                                   {(provided, snapshot) => (
                                     <ul
                                       {...provided.droppableProps}
                                       ref={provided.innerRef}
                                       className={`space-y-2 min-h-[100px] ${snapshot.isDraggingOver ? 'bg-secondary/50' : ''}`}
                                     >
-                                      {projectFeatures[project.id] && projectFeatures[project.id].map((feature, featureIndex) => (
-                                        <Draggable key={`${project.id}-${featureIndex}`} draggableId={`${project.id}-${featureIndex}`} index={featureIndex}>
+                                      {project.project_features && project.project_features.map((feature, index) => (
+                                        <Draggable key={`${project.id}-${feature.id}`} draggableId={`${project.id}-${feature.id}`} index={index}>
                                           {(provided, snapshot) => (
                                             <li
                                               ref={provided.innerRef}
@@ -269,7 +207,7 @@ export function CurrentProjects() {
                                             >
                                               <Checkbox
                                                 checked={feature.completed}
-                                                onCheckedChange={() => checkAndMoveCompletedProject(project.id, feature.id)}
+                                                onCheckedChange={() => handleToggleProjectFeature(project.id, feature.id)}
                                                 className="mr-2"
                                               />
                                               <span className={feature.completed ? 'line-through' : ''}>{feature.text}</span>

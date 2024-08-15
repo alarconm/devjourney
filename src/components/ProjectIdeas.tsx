@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/lib/supabase'
 
 export function ProjectIdeas() {
-  const { ideas, addIdea, removeIdea, moveIdeaToProject, updateIdeas } = useAppContext()
+  const { ideas, addIdea, removeIdea, moveIdeaToProject, updateIdeas, addIdeaFeature } = useAppContext()
   const [newIdea, setNewIdea] = useState({ title: '', description: '' })
   const [newFeature, setNewFeature] = useState('')
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
@@ -22,6 +22,50 @@ export function ProjectIdeas() {
   const [isBrainstormingOpen, setIsBrainstormingOpen] = useState(false)
   const [archivedNotes, setArchivedNotes] = useState<Array<{ text: string, timestamp: string }>>([])
 
+  const handleRemoveIdea = async (ideaId: string) => {
+    try {
+      await removeIdea(ideaId);
+      // Remove the idea from local state
+      updateIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== ideaId));
+    } catch (error) {
+      console.error('Error removing idea:', error);
+      refreshIdeas();
+    }
+  };
+
+  // Add this function to refresh ideas if needed
+  const refreshIdeas = async () => {
+    const { data, error } = await supabase
+      .from('ideas')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching ideas:', error);
+    } else {
+      updateIdeas(data);
+    }
+  };
+
+  useEffect(() => {
+    const ideasChannel = supabase.channel('ideas-changes')
+    
+    ideasChannel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          updateIdeas(prevIdeas => [...prevIdeas, payload.new as Idea])
+        } else if (payload.eventType === 'DELETE') {
+          updateIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== payload.old.id))
+        } else if (payload.eventType === 'UPDATE') {
+          updateIdeas(prevIdeas => prevIdeas.map(idea => idea.id === payload.new.id ? payload.new as Idea : idea))
+        }
+      })
+      .subscribe()
+
+    return () => {
+      ideasChannel.unsubscribe()
+    }
+  }, [updateIdeas])
+
   const toggleExpand = (ideaId: string) => {
     setExpandedIdeaId(prevId => prevId === ideaId ? null : ideaId);
   };
@@ -29,12 +73,15 @@ export function ProjectIdeas() {
   const handleBrainstormingSave = async () => {
     if (brainstormingText.trim()) {
       const timestamp = new Date().toISOString()
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('brainstorming_notes')
         .insert({ text: brainstormingText, timestamp })
-      if (error) console.error('Error saving brainstorming note:', error)
-      else {
-        setArchivedNotes(prev => [...prev, { text: brainstormingText, timestamp }])
+        .select()
+
+      if (error) {
+        console.error('Error saving brainstorming note:', error)
+      } else {
+        setArchivedNotes(prev => [data[0], ...prev])
         setBrainstormingText('')
       }
     }
@@ -43,57 +90,58 @@ export function ProjectIdeas() {
 
   const handleAddIdea = async () => {
     if (newIdea.title && newIdea.description) {
-      await addIdea(newIdea)
-      setNewIdea({ title: '', description: '' })
-      setIsDialogOpen(false)
+      const addedIdea = await addIdea(newIdea)
+      if (addedIdea) {
+        setNewIdea({ title: '', description: '' })
+        setIsDialogOpen(false)
+      }
     }
   }
 
   const handleAddFeature = async (ideaId: string) => {
     if (newFeature) {
-      const { data, error } = await supabase
-        .from('idea_features')
-        .insert([{ idea_id: ideaId, text: newFeature }])
-        .select()
-      if (error) {
-        console.error('Error adding idea feature:', error)
-      } else {
-        // Update the local state
-        const updatedIdeas = ideas.map(idea => {
-          if (idea.id === ideaId) {
-            return {
-              ...idea,
-              features: [...(idea.features || []), data[0].text]
-            }
-          }
-          return idea
-        })
-        // Update the ideas in the context
-        updateIdeas(updatedIdeas)
+      const addedFeature = await addIdeaFeature(ideaId, newFeature)
+      if (addedFeature) {
         setNewFeature('')
       }
     }
   }
 
   useEffect(() => {
-    const fetchIdeaFeatures = async () => {
+    const fetchArchivedNotes = async () => {
       const { data, error } = await supabase
-        .from('idea_features')
+        .from('brainstorming_notes')
         .select('*')
+        .order('timestamp', { ascending: false })
       if (error) {
-        console.error('Error fetching idea features:', error.message)
+        console.error('Error fetching archived notes:', error.message)
       } else {
-        const updatedIdeas = ideas.map(idea => ({
-          ...idea,
-          features: data
-            .filter(feature => feature.idea_id === idea.id)
-            .map(feature => feature.text)
-        }))
-        updateIdeas(updatedIdeas)
+        setArchivedNotes(data)
       }
     }
-    fetchIdeaFeatures()
+
+    fetchArchivedNotes()
   }, [])
+
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+
+    const items = Array.from(ideas);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    updateIdeas(items);
+
+    // Update order in the database
+    const { error } = await supabase
+      .from('ideas')
+      .update({ order: result.destination.index })
+      .eq('id', reorderedItem.id);
+
+    if (error) {
+      console.error('Error updating idea order:', error);
+    }
+  };
 
   return (
     <Card>
@@ -105,7 +153,7 @@ export function ProjectIdeas() {
         </Button>
       </CardHeader>
       <CardContent>
-        <DragDropContext>
+        <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="ideas" type="idea">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
@@ -176,7 +224,7 @@ export function ProjectIdeas() {
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => removeIdea(idea.id)}>
+                                        <AlertDialogAction onClick={() => handleRemoveIdea(idea.id)}>
                                           Remove
                                         </AlertDialogAction>
                                       </AlertDialogFooter>
