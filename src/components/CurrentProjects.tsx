@@ -15,16 +15,45 @@ import { Badge } from "@/components/ui/badge"
 import { supabase } from '@/lib/supabase'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills } = useAppContext()
+  const { fetchProjects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills, moveProjectToIdea, moveIdeaToProject } = useAppContext()
+  const [projects, setProjects] = useState<Project[]>([])
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
   const [projectOrder, setProjectOrder] = useState<string[]>([])
   const [projectFeatures, setProjectFeatures] = useState<{[key: string]: {id: string, text: string, completed: boolean}[]}>({})
 
   useEffect(() => {
-    fetchProjectOrder()
-    fetchProjectFeatures()
-  }, [projects])
+    fetchProjectsFromDB()
+  }, [])
+
+  const fetchProjectsFromDB = async () => {
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .neq('status', 'completed')
+
+    if (projectsError) {
+      console.error('Error fetching projects:', projectsError)
+      return
+    }
+
+    const { data: featuresData, error: featuresError } = await supabase
+      .from('project_features')
+      .select('*')
+
+    if (featuresError) {
+      console.error('Error fetching project features:', featuresError)
+      return
+    }
+
+    const projectsWithFeatures = projectsData.map(project => ({
+      ...project,
+      features: featuresData.filter(feature => feature.project_id === project.id)
+    }))
+
+    setProjects(projectsWithFeatures)
+  }
 
   const fetchProjectOrder = async () => {
     const { data, error } = await supabase
@@ -50,9 +79,11 @@ export function CurrentProjects() {
     }
   }
 
-  const sortedProjects = projectOrder
-    .map(id => projects.find(p => p.id === id))
-    .filter(Boolean) as Project[]
+  const sortedProjects = projectOrder.length > 0
+    ? projectOrder
+        .map(id => projects.find(p => p.id === id))
+        .filter(Boolean) as Project[]
+    : projects
 
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return
@@ -148,6 +179,12 @@ export function CurrentProjects() {
     }
   }
 
+  const handleRemoveProject = async (projectId: string) => {
+    await removeProject(projectId)
+    setProjects(projects.filter(p => p.id !== projectId))
+    await fetchProjectOrder()
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -155,9 +192,6 @@ export function CurrentProjects() {
         <CardDescription>Track your ongoing projects</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button onClick={() => removeProject()} variant="destructive" className="mb-4">
-          Clear All Projects (Temporary)
-        </Button>
         <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="currentProjects" type="project">
             {(provided) => (
@@ -201,14 +235,14 @@ export function CurrentProjects() {
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Move to Ideas?</AlertDialogTitle>
+                                    <AlertDialogTitle>Move Project to Ideas?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to move this project back to ideas? This will reset its progress.
+                                      Are you sure you want to move this project back to ideas? This action cannot be undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => removeProject(project.id)}>
+                                    <AlertDialogAction onClick={() => moveProjectToIdea(project.id)}>
                                       Move to Ideas
                                     </AlertDialogAction>
                                   </AlertDialogFooter>

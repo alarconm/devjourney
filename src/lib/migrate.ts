@@ -5,10 +5,16 @@ import * as dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });
 
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error('DATABASE_URL is not set in .env.local');
+  process.exit(1);
+}
+
 const { Pool } = pg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl,
   ssl: { rejectUnauthorized: false }
 });
 
@@ -16,7 +22,7 @@ const db = drizzle(pool);
 
 async function main() {
   console.log('Migration started');
-  console.log('Database URL:', process.env.DATABASE_URL);
+  console.log('Database URL:', databaseUrl.replace(/:\/\/[^@]+@/, '://****:****@'));
   try {
     console.log('Attempting to connect to the database...');
     await pool.query('SELECT NOW()');

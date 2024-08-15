@@ -7,6 +7,7 @@ export const projects = pgTable('projects', {
   progress: integer('progress').notNull().default(0),
   status: text('status').notNull().default('in_progress'),
   createdAt: timestamp('created_at').defaultNow(),
+  associatedSkills: uuid('associated_skills').array(),
 })
 
 export const projectFeatures = pgTable('project_features', {
@@ -57,4 +58,10 @@ export const learningJourneyOrder = pgTable('learning_journey_order', {
   id: uuid('id').defaultRandom().primaryKey(),
   projectId: uuid('project_id').references(() => projects.id).notNull(),
   order: integer('order').notNull(),
+})
+
+export const brainstormingNotes = pgTable('brainstorming_notes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  text: text('text').notNull(),
+  timestamp: timestamp('timestamp').notNull(),
 })

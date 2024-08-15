@@ -22,8 +22,11 @@ export function CompletedProjects() {
       .select('*')
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
-    if (error) console.error('Error fetching completed projects:', error)
-    else setCompletedProjects(data)
+    if (error) {
+      console.error('Error fetching completed projects:', error.message)
+    } else {
+      setCompletedProjects(data || [])
+    }
   }
 
   return (

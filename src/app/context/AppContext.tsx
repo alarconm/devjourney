@@ -15,6 +15,7 @@ export interface Idea {
   id: string
   title: string
   description: string
+  features?: string[]
 }
 
 export interface Skill {
@@ -41,6 +42,10 @@ interface AppContextType {
   fetchProjects: () => Promise<void>
   fetchIdeas: () => Promise<void>
   fetchSkills: () => Promise<void>
+  moveProjectToIdea: (projectId: string) => Promise<void>
+  moveIdeaToProject: (ideaId: string) => Promise<void>
+  updateIdeas: (updatedIdeas: Idea[]) => void
+  fetchCompletedProjects: () => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -68,10 +73,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else setSkills(data)
   }
 
+  const fetchCompletedProjects = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+    if (error) console.error('Error fetching completed projects:', error.message)
+    else setProjects(prevProjects => [...prevProjects, ...data])
+  }
+
   useEffect(() => {
     fetchProjects()
     fetchIdeas()
     fetchSkills()
+    fetchCompletedProjects()
   }, [])
 
   const addProject = async (project: Omit<Project, 'id' | 'progress' | 'status'>) => {
@@ -114,7 +130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .select()
     if (error) console.error('Error adding idea:', error)
     else {
-      setIdeas([...ideas, data[0]])
+      setIdeas(prevIdeas => [...prevIdeas, data[0]])
     }
   }
 
@@ -125,7 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .eq('id', id)
     if (error) console.error('Error removing idea:', error)
     else {
-      setIdeas(ideas.filter(i => i.id !== id))
+      setIdeas(prevIdeas => prevIdeas.filter(i => i.id !== id))
     }
   }
 
@@ -198,6 +214,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error) console.error('Error associating skill with project:', error)
   }
 
+  const moveProjectToIdea = async (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+
+    const { data: idea, error: ideaError } = await supabase
+      .from('ideas')
+      .insert([{ title: project.title, description: project.description }])
+      .select()
+
+    if (ideaError) {
+      console.error('Error creating idea:', ideaError)
+      return
+    }
+
+    await removeProject(projectId)
+    setIdeas(prevIdeas => [...prevIdeas, idea[0]])
+  }
+
+  const moveIdeaToProject = async (ideaId: string) => {
+    const idea = ideas.find(i => i.id === ideaId)
+    if (!idea) return
+
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .insert([{ title: idea.title, description: idea.description, progress: 0, status: 'in_progress' }])
+      .select()
+
+    if (projectError) {
+      console.error('Error creating project:', projectError)
+      return
+    }
+
+    // Move features from idea to project
+    const { data: ideaFeatures, error: featuresError } = await supabase
+      .from('idea_features')
+      .select('*')
+      .eq('idea_id', ideaId)
+
+    if (featuresError) {
+      console.error('Error fetching idea features:', featuresError)
+    } else if (ideaFeatures) {
+      const projectFeatures = ideaFeatures.map(feature => ({
+        project_id: project[0].id,
+        text: feature.text,
+        completed: false
+      }))
+
+      const { error: insertError } = await supabase
+        .from('project_features')
+        .insert(projectFeatures)
+
+      if (insertError) {
+        console.error('Error inserting project features:', insertError)
+      }
+    }
+
+    await removeIdea(ideaId)
+    setProjects(prevProjects => [...prevProjects, project[0]])
+  }
+
+  const updateIdeas = (updatedIdeas: Idea[]) => {
+    setIdeas(updatedIdeas)
+  }
+
   const contextValue = {
     projects,
     ideas,
@@ -216,6 +296,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchProjects,
     fetchIdeas,
     fetchSkills,
+    moveProjectToIdea,
+    moveIdeaToProject,
+    updateIdeas,
+    fetchCompletedProjects,
   }
 
   return (
