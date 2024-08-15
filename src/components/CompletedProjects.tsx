@@ -1,60 +1,46 @@
 "use client"
 
+import React, { useState, useEffect } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Button } from "@/components/ui/button"
+import { supabase } from '@/lib/supabase'
 
 export function CompletedProjects() {
-  const { completedProjects, moveCompletedToProject, skills } = useAppContext()
+  const { fetchCompletedProjects } = useAppContext()
+  const [completedProjects, setCompletedProjects] = useState<CompletedProject[]>([])
+
+  useEffect(() => {
+    fetchCompletedProjectsFromDB()
+  }, [])
+
+  const fetchCompletedProjectsFromDB = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+    if (error) console.error('Error fetching completed projects:', error)
+    else setCompletedProjects(data)
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-primary">Completed Projects</CardTitle>
-        <CardDescription>Showcase your achievements</CardDescription>
+        <CardDescription>Your finished projects</CardDescription>
       </CardHeader>
       <CardContent>
         {completedProjects.map((project) => (
-          <HoverCard key={project.id}>
-            <HoverCardTrigger asChild>
-              <Card className="mb-4 cursor-pointer">
-                <CardHeader>
-                  <CardTitle>{project.title}</CardTitle>
-                  <Badge>Completed</Badge>
-                </CardHeader>
-              </Card>
-            </HoverCardTrigger>
-            <HoverCardContent>
-              <p>{project.description}</p>
-              <ul className="mt-2">
-                {project.features && project.features.map((feature, index) => (
-                  <li key={index} className="flex items-center">
-                    <span className="mr-2">✓</span>
-                    {feature.text}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4">
-                <h4 className="text-sm font-semibold mb-2">Skills Used</h4>
-                <div className="flex flex-wrap gap-2">
-                  {project.associatedSkills && project.associatedSkills.map((skillId) => {
-                    const skill = skills.find(s => s.id === skillId)
-                    return skill ? (
-                      <Badge key={skillId}>{skill.name}</Badge>
-                    ) : null
-                  })}
-                </div>
-              </div>
-              <Button 
-                onClick={() => moveCompletedToProject(project.id)} 
-                className="mt-4"
-              >
-                Move to Current Projects
-              </Button>
-            </HoverCardContent>
-          </HoverCard>
+          <div key={project.id} className="mb-4">
+            <h3 className="text-lg font-semibold">{project.title}</h3>
+            <p className="text-sm text-muted-foreground">{project.description}</p>
+            <div className="mt-2 flex items-center">
+              <Badge variant="outline">Completed on: {new Date(project.created_at).toLocaleDateString()}</Badge>
+            </div>
+          </div>
         ))}
       </CardContent>
     </Card>

@@ -4,16 +4,20 @@ import React, { useState } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { supabase } from '@/lib/supabase'
 
 export function AddSkillForm() {
   const [skillName, setSkillName] = useState('')
   const { addSkill } = useAppContext()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (skillName.trim()) {
-      addSkill({ name: skillName.trim() })
-      setSkillName('')
+      const { error } = await addSkill({ name: skillName.trim(), level: 1 })
+      if (error) console.error('Error adding skill:', error)
+      else {
+        setSkillName('')
+      }
     }
   }
 

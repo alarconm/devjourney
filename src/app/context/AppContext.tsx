@@ -1,23 +1,20 @@
 "use client"
 
-import React, { createContext, useContext, ReactNode, useState } from 'react'
-import { useLocalStorage } from '@/app/hooks/useLocalStorage'
-import { initialSkills } from '@/data/initialSkills'
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export interface Project {
   id: string
   title: string
   description: string
   progress: number
-  features: { text: string; completed: boolean }[]
-  associatedSkills: string[]
+  status: string
 }
 
 export interface Idea {
   id: string
   title: string
   description: string
-  features: string[]
 }
 
 export interface Skill {
@@ -29,326 +26,182 @@ export interface Skill {
 interface AppContextType {
   projects: Project[]
   ideas: Idea[]
-  projectOrder: string[]
-  ideaOrder: string[]
-  learningJourneyOrder: string[];
-  addProject: (project: Omit<Project, 'id' | 'progress' | 'features'>) => void
-  updateProject: (updatedProject: Project) => void
-  removeProject: (id: string) => void
-  addIdea: (idea: Omit<Idea, 'id'>) => void
-  removeIdea: (id: string) => void
-  reorderLearningJourney: (startIndex: number, endIndex: number) => void;
-  addProjectFeature: (projectId: string, feature: string) => void
-  toggleProjectFeature: (projectId: string, featureIndex: number) => void
-  reorderIdeas: (startIndex: number, endIndex: number) => void
-  reorderProjects: (startIndex: number, endIndex: number) => void
-  reorderProjectFeatures: (projectId: string, startIndex: number, endIndex: number) => void
-  reorderIdeaFeatures: (ideaId: string, startIndex: number, endIndex: number) => void
-  moveIdeaToProject: (ideaId: string) => void
-  clearAllProjects: () => void
-  addIdeaFeature: (ideaId: string, feature: string) => void
-  moveProjectToCompleted: (projectId: string) => void
-  moveCompletedToProject: (projectId: string) => void
-  completedProjects: Project[]
-  updateProjectOrder: () => void
   skills: Skill[]
-  addSkill: (skill: Omit<Skill, 'id'>) => void
-  updateSkill: (updatedSkill: Skill) => void
-  removeSkill: (id: string) => void
-  associateSkillWithProject: (projectId: string, skillId: string) => void
-  levelUpSkill: (skillId: string) => void
-  moveProjectToIdea: (projectId: string) => void
-  adjustSkillLevels: (projectSkills: string[], increment: boolean) => void
+  addProject: (project: Omit<Project, 'id' | 'progress' | 'status'>) => Promise<void>
+  updateProject: (updatedProject: Project) => Promise<void>
+  removeProject: (id: string) => Promise<void>
+  addIdea: (idea: Omit<Idea, 'id'>) => Promise<void>
+  removeIdea: (id: string) => Promise<void>
+  addProjectFeature: (projectId: string, feature: string) => Promise<void>
+  toggleProjectFeature: (projectId: string, featureId: string) => Promise<void>
+  addSkill: (skill: Omit<Skill, 'id'>) => Promise<void>
+  updateSkill: (updatedSkill: Skill) => Promise<void>
+  removeSkill: (id: string) => Promise<void>
+  associateSkillWithProject: (projectId: string, skillId: string) => Promise<void>
+  fetchProjects: () => Promise<void>
+  fetchIdeas: () => Promise<void>
+  fetchSkills: () => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = useLocalStorage<Project[]>('projects', [])
-  const [completedProjects, setCompletedProjects] = useLocalStorage<Project[]>('completedProjects', [])
-  const [ideas, setIdeas] = useLocalStorage<Idea[]>('ideas', [])
-  const [projectOrder, setProjectOrder] = useLocalStorage<string[]>('projectOrder', [])
-  const [ideaOrder, setIdeaOrder] = useLocalStorage<string[]>('ideaOrder', [])
-  const [learningJourneyOrder, setLearningJourneyOrder] = useLocalStorage<string[]>('learningJourneyOrder', [])
-  const [skills, setSkills] = useLocalStorage<Skill[]>('skills', initialSkills.map((skill, index) => ({ ...skill, id: `skill-${index + 1}` })))
+  const [projects, setProjects] = useState<Project[]>([])
+  const [ideas, setIdeas] = useState<Idea[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
 
-  // Initialize learningJourneyOrder if it's empty
-  React.useEffect(() => {
-    if (learningJourneyOrder.length === 0) {
-      const allProjectIds = [...projects, ...completedProjects].map(p => p.id)
-      setLearningJourneyOrder(allProjectIds)
-    }
-  }, [projects, completedProjects, learningJourneyOrder])
-
-  const addProject = (project: Omit<Project, 'id' | 'progress' | 'features'>) => {
-    const newProject: Project = {
-      ...project,
-      id: Date.now().toString(),
-      progress: 0,
-      features: []
-    }
-    setProjects(prevProjects => [...prevProjects, newProject])
-    setProjectOrder(prevOrder => [...prevOrder, newProject.id])
+  const fetchProjects = async () => {
+    const { data, error } = await supabase.from('projects').select('*')
+    if (error) console.error('Error fetching projects:', error)
+    else setProjects(data)
   }
 
-  const updateProject = (updatedProject: Project) => {
-    setProjects(prevProjects => {
-      const index = prevProjects.findIndex(p => p.id === updatedProject.id);
-      if (index !== -1) {
-        const newProjects = [...prevProjects];
-        newProjects[index] = updatedProject;
-        return newProjects;
-      }
-      return prevProjects;
-    });
+  const fetchIdeas = async () => {
+    const { data, error } = await supabase.from('ideas').select('*')
+    if (error) console.error('Error fetching ideas:', error)
+    else setIdeas(data)
   }
 
-  const removeProject = (id: string) => {
-    setProjects(prevProjects => prevProjects.filter(p => p.id !== id))
-    setProjectOrder(prevOrder => prevOrder.filter(projectId => projectId !== id))
+  const fetchSkills = async () => {
+    const { data, error } = await supabase.from('skills').select('*')
+    if (error) console.error('Error fetching skills:', error)
+    else setSkills(data)
   }
 
-  const addIdea = (idea: Omit<Idea, 'id'>) => {
-    const newIdea: Idea = {
-      ...idea,
-      id: Date.now().toString(),
-      features: idea.features || []
-    }
-    setIdeas([...ideas, newIdea])
-  }
+  useEffect(() => {
+    fetchProjects()
+    fetchIdeas()
+    fetchSkills()
+  }, [])
 
-  const removeIdea = (id: string) => {
-    setIdeas(ideas.filter(i => i.id !== id))
-  }
-
-  const addProjectFeature = (projectId: string, feature: string) => {
-    setProjects(projects.map(p => {
-      if (p.id === projectId) {
-        const newFeatures = [...p.features, { text: feature, completed: false }]
-        const progress = calculateProgress(newFeatures)
-        return { ...p, features: newFeatures, progress }
-      }
-      return p
-    }))
-  }
-
-  const toggleProjectFeature = (projectId: string, featureIndex: number) => {
-    setProjects(projects.map(p => {
-      if (p.id === projectId) {
-        const newFeatures = [...p.features]
-        newFeatures[featureIndex].completed = !newFeatures[featureIndex].completed
-        const progress = calculateProgress(newFeatures)
-        return { ...p, features: newFeatures, progress }
-      }
-      return p
-    }))
-  }
-
-  const calculateProgress = (features: { completed: boolean }[]): number => {
-    const completedFeatures = features.filter(m => m.completed).length
-    return features.length > 0 ? (completedFeatures / features.length) * 100 : 0
-  }
-
-  const reorderIdeas = (startIndex: number, endIndex: number) => {
-    setIdeaOrder((prevOrder) => {
-      const result = Array.from(prevOrder);
-      const [removed] = result.splice(startIndex, 1);
-      result.splice(endIndex, 0, removed);
-      return result;
-    });
-  }
-
-  const reorderProjects = (startIndex: number, endIndex: number) => {
-    setProjectOrder(prevOrder => {
-      const result = Array.from(prevOrder);
-      const [removed] = result.splice(startIndex, 1);
-      result.splice(endIndex, 0, removed);
-      return result;
-    });
-  }
-
-  const reorderProjectFeatures = (projectId: string, startIndex: number, endIndex: number) => {
-    setProjects(projects.map(p => {
-      if (p.id === projectId) {
-        const newFeatures = Array.from(p.features)
-        const [removed] = newFeatures.splice(startIndex, 1)
-        newFeatures.splice(endIndex, 0, removed)
-        return { ...p, features: newFeatures }
-      }
-      return p
-    }))
-  }
-
-  const reorderIdeaFeatures = (ideaId: string, startIndex: number, endIndex: number) => {
-    setIdeas(ideas.map(idea => {
-      if (idea.id === ideaId) {
-        const newFeatures = Array.from(idea.features)
-        const [removed] = newFeatures.splice(startIndex, 1)
-        newFeatures.splice(endIndex, 0, removed)
-        return { ...idea, features: newFeatures }
-      }
-      return idea
-    }))
-  }
-
-  const reorderLearningJourney = (startIndex: number, endIndex: number) => {
-    setLearningJourneyOrder(prevOrder => {
-      const result = Array.from(prevOrder);
-      const [removed] = result.splice(startIndex, 1);
-      result.splice(endIndex, 0, removed);
-      return result;
-    });
-  };
-
-  const moveIdeaToProject = (ideaId: string) => {
-    const idea = ideas.find(i => i.id === ideaId)
-    if (idea) {
-      const newProject: Project = {
-        id: Date.now().toString(),
-        title: idea.title,
-        description: idea.description,
-        progress: 0,
-        features: idea.features.map(text => ({ text, completed: false })),
-        associatedSkills: []
-      }
-      setProjects(prevProjects => [...prevProjects, newProject])
-      setProjectOrder(prevOrder => [...prevOrder, newProject.id])
-      removeIdea(ideaId)
+  const addProject = async (project: Omit<Project, 'id' | 'progress' | 'status'>) => {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([{ ...project, progress: 0, status: 'in_progress' }])
+      .select()
+    if (error) console.error('Error adding project:', error)
+    else {
+      setProjects([...projects, data[0]])
     }
   }
 
-  const clearAllProjects = () => {
-    setProjects([])
-  }
-
-  const addIdeaFeature = (ideaId: string, feature: string) => {
-    setIdeas(ideas.map(idea => {
-      if (idea.id === ideaId) {
-        return { ...idea, features: [...(idea.features || []), feature] }
-      }
-      return idea
-    }))
-  }
-
-  const moveProjectToCompleted = (projectId: string) => {
-    setProjects(prevProjects => {
-      const projectToMove = prevProjects.find(p => p.id === projectId);
-      if (projectToMove) {
-        setCompletedProjects(prev => [...prev, { ...projectToMove, progress: 100, associatedSkills: projectToMove.associatedSkills || [] }]);
-
-        // Level up associated skills
-        if (projectToMove.associatedSkills) {
-          adjustSkillLevels(projectToMove.associatedSkills, true);
-        }
-
-        return prevProjects.filter(p => p.id !== projectId);
-      }
-      return prevProjects;
-    });
-    setProjectOrder(prevOrder => prevOrder.filter(id => id !== projectId));
-  }
-
-  const moveCompletedToProject = (projectId: string) => {
-    setCompletedProjects(prev => {
-      const projectToMove = prev.find(p => p.id === projectId);
-      if (projectToMove) {
-        setProjects(prevProjects => [...prevProjects, { ...projectToMove, progress: 99 }]);
-        
-        // Remove skill levels gained from this project
-        if (projectToMove.associatedSkills) {
-          adjustSkillLevels(projectToMove.associatedSkills, false);
-        }
-        
-        return prev.filter(p => p.id !== projectId);
-      }
-      return prev;
-    });
-  }
-
-  const updateProjectOrder = () => {
-    setProjectOrder(projects.map(p => p.id));
-  };
-
-  const ensureProjectOrder = () => {
-    setProjectOrder(prevOrder => {
-      const currentIds = projects.map(p => p.id);
-      const newOrder = prevOrder.filter(id => currentIds.includes(id));
-      const missingIds = currentIds.filter(id => !newOrder.includes(id));
-      return [...newOrder, ...missingIds];
-    });
-  };
-
-  const addSkill = (skill: Omit<Skill, 'id'>) => {
-    const newSkill: Skill = {
-      ...skill,
-      id: Date.now().toString(),
-      level: 1
+  const updateProject = async (updatedProject: Project) => {
+    const { error } = await supabase
+      .from('projects')
+      .update(updatedProject)
+      .eq('id', updatedProject.id)
+    if (error) console.error('Error updating project:', error)
+    else {
+      setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p))
     }
-    setSkills(prevSkills => [...prevSkills, newSkill])
   }
 
-  const updateSkill = (updatedSkill: Skill) => {
-    setSkills(prevSkills =>
-      prevSkills.map(skill => (skill.id === updatedSkill.id ? updatedSkill : skill))
-    )
+  const removeProject = async (id: string) => {
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id)
+    if (error) console.error('Error removing project:', error)
+    else {
+      setProjects(projects.filter(p => p.id !== id))
+    }
   }
 
-  const removeSkill = (id: string) => {
-    setSkills(prevSkills => prevSkills.filter(skill => skill.id !== id))
+  const addIdea = async (idea: Omit<Idea, 'id'>) => {
+    const { data, error } = await supabase
+      .from('ideas')
+      .insert([idea])
+      .select()
+    if (error) console.error('Error adding idea:', error)
+    else {
+      setIdeas([...ideas, data[0]])
+    }
   }
 
-  const associateSkillWithProject = (projectId: string, skillId: string) => {
-    setProjects(prevProjects =>
-      prevProjects.map(project =>
-        project.id === projectId
-          ? { ...project, associatedSkills: [...(project.associatedSkills || []), skillId] }
-          : project
-      )
-    )
+  const removeIdea = async (id: string) => {
+    const { error } = await supabase
+      .from('ideas')
+      .delete()
+      .eq('id', id)
+    if (error) console.error('Error removing idea:', error)
+    else {
+      setIdeas(ideas.filter(i => i.id !== id))
+    }
   }
 
-  const levelUpSkill = (skillId: string) => {
-    setSkills(prevSkills =>
-      prevSkills.map(skill =>
-        skill.id === skillId ? { ...skill, level: skill.level + 1 } : skill
-      )
-    )
+  const addProjectFeature = async (projectId: string, feature: string) => {
+    const { error } = await supabase
+      .from('project_features')
+      .insert([{ project_id: projectId, text: feature, completed: false }])
+    if (error) console.error('Error adding project feature:', error)
   }
 
-  const moveProjectToIdea = (projectId: string) => {
-    setProjects(prevProjects => {
-      const projectToMove = prevProjects.find(p => p.id === projectId);
-      if (projectToMove) {
-        const newIdea: Idea = {
-          id: projectToMove.id,
-          title: projectToMove.title,
-          description: projectToMove.description,
-          features: projectToMove.features.map(f => f.text)
-        };
-        setIdeas(prevIdeas => [...prevIdeas, newIdea]);
-        setIdeaOrder(prevOrder => [...prevOrder, newIdea.id]);
-        return prevProjects.filter(p => p.id !== projectId);
-      }
-      return prevProjects;
-    });
-    setProjectOrder(prevOrder => prevOrder.filter(id => id !== projectId));
-  };
+  const toggleProjectFeature = async (projectId: string, featureId: string) => {
+    const { data, error } = await supabase
+      .from('project_features')
+      .select('completed')
+      .eq('id', featureId)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching feature:', error)
+      return
+    }
 
-  const adjustSkillLevels = (projectSkills: string[], increment: boolean) => {
-    setSkills(prevSkills =>
-      prevSkills.map(skill =>
-        projectSkills.includes(skill.id)
-          ? { ...skill, level: increment ? skill.level + 1 : Math.max(0, skill.level - 1) }
-          : skill
-      )
-    );
-  };
+    const { error: updateError } = await supabase
+      .from('project_features')
+      .update({ completed: !data.completed })
+      .eq('id', featureId)
+    
+    if (updateError) {
+      console.error('Error toggling project feature:', updateError)
+    }
+  }
+
+  const addSkill = async (skill: Omit<Skill, 'id'>) => {
+    const { data, error } = await supabase
+      .from('skills')
+      .insert([skill])
+      .select()
+    if (error) console.error('Error adding skill:', error)
+    else {
+      setSkills([...skills, data[0]])
+    }
+  }
+
+  const updateSkill = async (updatedSkill: Skill) => {
+    const { error } = await supabase
+      .from('skills')
+      .update(updatedSkill)
+      .eq('id', updatedSkill.id)
+    if (error) console.error('Error updating skill:', error)
+    else {
+      setSkills(skills.map(s => s.id === updatedSkill.id ? updatedSkill : s))
+    }
+  }
+
+  const removeSkill = async (id: string) => {
+    const { error } = await supabase
+      .from('skills')
+      .delete()
+      .eq('id', id)
+    if (error) console.error('Error removing skill:', error)
+    else {
+      setSkills(skills.filter(s => s.id !== id))
+    }
+  }
+
+  const associateSkillWithProject = async (projectId: string, skillId: string) => {
+    const { error } = await supabase
+      .from('project_skills')
+      .insert([{ project_id: projectId, skill_id: skillId }])
+    if (error) console.error('Error associating skill with project:', error)
+  }
 
   const contextValue = {
     projects,
     ideas,
-    projectOrder,
-    ideaOrder,
+    skills,
     addProject,
     updateProject,
     removeProject,
@@ -356,34 +209,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeIdea,
     addProjectFeature,
     toggleProjectFeature,
-    reorderIdeas,
-    reorderProjects,
-    reorderProjectFeatures,
-    reorderIdeaFeatures,
-    moveIdeaToProject,
-    clearAllProjects,
-    addIdeaFeature,
-    moveProjectToCompleted,
-    moveCompletedToProject,
-    completedProjects,
-    updateProjectOrder,
-    skills,
     addSkill,
     updateSkill,
     removeSkill,
     associateSkillWithProject,
-    levelUpSkill,
-    moveProjectToIdea,
-    adjustSkillLevels
-  };
-
-  React.useEffect(() => {
-    ensureProjectOrder();
-  }, [projects]);
-
-  React.useEffect(() => {
-    setIdeaOrder(ideas.map(i => i.id));
-  }, [ideas]);
+    fetchProjects,
+    fetchIdeas,
+    fetchSkills,
+  }
 
   return (
     <AppContext.Provider value={contextValue}>

@@ -1,31 +1,44 @@
 "use client"
 
-import React from 'react'
-import { useAppContext } from '@/app/context/AppContext'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import React, { useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
-interface SkillSelectorProps {
-  selectedSkills: string[]
-  onSkillSelect: (skillId: string) => void
+interface Skill {
+  name: string
+  level: number
 }
 
-export function SkillSelector({ selectedSkills, onSkillSelect }: SkillSelectorProps) {
-  const { skills } = useAppContext()
+export function SkillSelector({ selectedSkills, onSkillSelect }) {
+  const [skills, setSkills] = useState<Skill[]>([])
 
-  const availableSkills = skills.filter(skill => !selectedSkills.includes(skill.id))
+  React.useEffect(() => {
+    fetchSkills()
+  }, [])
+
+  const fetchSkills = async () => {
+    const { data, error } = await supabase.from('skills').select('*')
+    if (error) console.error('Error fetching skills:', error)
+    else setSkills(data)
+  }
 
   return (
-    <Select onValueChange={onSkillSelect}>
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select a skill" />
-      </SelectTrigger>
-      <SelectContent>
-        {availableSkills.map((skill) => (
-          <SelectItem key={skill.id} value={skill.id}>
+    <div>
+      <h3 className="text-lg font-semibold">Select skills</h3>
+      <div className="mt-2">
+        {skills.map((skill) => (
+          <button
+            key={skill.name}
+            onClick={() => onSkillSelect(skill.name)}
+            className={`mr-2 mb-2 px-3 py-1 rounded-full ${
+              selectedSkills.includes(skill.name)
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-700'
+            }`}
+          >
             {skill.name}
-          </SelectItem>
+          </button>
         ))}
-      </SelectContent>
-    </Select>
+      </div>
+    </div>
   )
 }

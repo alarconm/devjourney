@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Idea } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,10 +10,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { supabase } from '@/lib/supabase'
 
 export function ProjectIdeas() {
-  const { ideas, ideaOrder, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature, reorderIdeaFeatures } = useAppContext()
-  const [newIdea, setNewIdea] = useState({ title: '', description: '', features: [] })
+  const { fetchIdeas } = useAppContext()
+  const [ideas, setIdeas] = useState<Idea[]>([])
+  const [ideaOrder, setIdeaOrder] = useState<string[]>([])
+  const [newIdea, setNewIdea] = useState({ title: '', description: '' })
   const [newFeature, setNewFeature] = useState('')
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -21,28 +24,90 @@ export function ProjectIdeas() {
   const [isBrainstormingOpen, setIsBrainstormingOpen] = useState(false)
   const [archivedNotes, setArchivedNotes] = useState<Array<{ text: string, timestamp: string }>>([])
 
-  const handleBrainstormingSave = () => {
+  useEffect(() => {
+    fetchIdeasAndOrder()
+  }, [])
+
+  const fetchIdeasAndOrder = async () => {
+    const { data: ideasData, error: ideasError } = await supabase.from('ideas').select('*')
+    if (ideasError) console.error('Error fetching ideas:', ideasError)
+    else setIdeas(ideasData)
+
+    const { data: orderData, error: orderError } = await supabase
+      .from('idea_order')
+      .select('*')
+      .order('order', { ascending: true })
+    if (orderError) console.error('Error fetching idea order:', orderError)
+    else setIdeaOrder(orderData.map(item => item.idea_id))
+  }
+
+  const handleBrainstormingSave = async () => {
     if (brainstormingText.trim()) {
-      const timestamp = new Date().toLocaleString()
-      setArchivedNotes(prev => [...prev, { text: brainstormingText, timestamp }])
-      setBrainstormingText('')
+      const timestamp = new Date().toISOString()
+      const { error } = await supabase
+        .from('brainstorming_notes')
+        .insert({ text: brainstormingText, timestamp })
+      if (error) console.error('Error saving brainstorming note:', error)
+      else {
+        setArchivedNotes(prev => [...prev, { text: brainstormingText, timestamp }])
+        setBrainstormingText('')
+      }
     }
     setIsBrainstormingOpen(false)
   }
 
   const sortedIdeas = ideaOrder.map(id => ideas.find(i => i.id === id)).filter(Boolean) as Idea[]
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return
 
     const sourceIndex = result.source.index
     const destinationIndex = result.destination.index
 
     if (result.type === 'idea') {
-      reorderIdeas(sourceIndex, destinationIndex)
+      const newOrder = Array.from(ideaOrder)
+      const [removed] = newOrder.splice(sourceIndex, 1)
+      newOrder.splice(destinationIndex, 0, removed)
+
+      setIdeaOrder(newOrder)
+
+      const updates = newOrder.map((id, index) => ({
+        idea_id: id,
+        order: index
+      }))
+
+      const { error } = await supabase
+        .from('idea_order')
+        .upsert(updates, { onConflict: 'idea_id' })
+
+      if (error) console.error('Error updating idea order:', error)
     } else if (result.type === 'feature') {
       const ideaId = result.draggableId.split('-')[0]
-      reorderIdeaFeatures(ideaId, sourceIndex, destinationIndex)
+      const { data: features, error: fetchError } = await supabase
+        .from('idea_features')
+        .select('*')
+        .eq('idea_id', ideaId)
+        .order('order', { ascending: true })
+
+      if (fetchError) {
+        console.error('Error fetching idea features:', fetchError)
+        return
+      }
+
+      const newFeatures = Array.from(features)
+      const [removed] = newFeatures.splice(sourceIndex, 1)
+      newFeatures.splice(destinationIndex, 0, removed)
+
+      const updates = newFeatures.map((feature, index) => ({
+        id: feature.id,
+        order: index
+      }))
+
+      const { error } = await supabase
+        .from('idea_features')
+        .upsert(updates, { onConflict: 'id' })
+
+      if (error) console.error('Error updating feature order:', error)
     }
   }
 
@@ -50,19 +115,89 @@ export function ProjectIdeas() {
     setExpandedIdeaId(expandedIdeaId === ideaId ? null : ideaId)
   }
 
-  const handleAddIdea = () => {
+  const handleAddIdea = async () => {
     if (newIdea.title && newIdea.description) {
-      addIdea({ ...newIdea, features: [] })
-      setNewIdea({ title: '', description: '', features: [] })
-      setIsDialogOpen(false)
+      const { data, error } = await supabase
+        .from('ideas')
+        .insert([newIdea])
+        .select()
+      if (error) {
+        console.error('Error adding idea:', error)
+      } else if (data) {
+        setIdeas(prevIdeas => [...prevIdeas, data[0]])
+        setNewIdea({ title: '', description: '' })
+        setIsDialogOpen(false)
+        await fetchIdeasAndOrder()  // Add this line to refresh the ideas list
+      }
     }
   }
 
-  const handleAddFeature = (ideaId: string) => {
+  const handleAddFeature = async (ideaId: string) => {
     if (newFeature) {
-      addIdeaFeature(ideaId, newFeature)
-      setNewFeature('')
+      const { error } = await supabase
+        .from('idea_features')
+        .insert([{ idea_id: ideaId, text: newFeature }])
+      if (error) console.error('Error adding idea feature:', error)
+      else {
+        setNewFeature('')
+        await fetchIdeasAndOrder()
+      }
     }
+  }
+
+  const removeIdea = async (id: string) => {
+    const { error } = await supabase
+      .from('ideas')
+      .delete()
+      .eq('id', id)
+    if (error) console.error('Error removing idea:', error)
+    else {
+      await fetchIdeasAndOrder()
+    }
+  }
+
+  const moveIdeaToProject = async (ideaId: string) => {
+    const idea = ideas.find(i => i.id === ideaId)
+    if (!idea) return
+
+    const { data: features, error: featuresError } = await supabase
+      .from('idea_features')
+      .select('*')
+      .eq('idea_id', ideaId)
+
+    if (featuresError) {
+      console.error('Error fetching idea features:', featuresError)
+      return
+    }
+
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .insert([{ title: idea.title, description: idea.description, progress: 0 }])
+      .select()
+
+    if (projectError) {
+      console.error('Error creating project:', projectError)
+      return
+    }
+
+    if (features && features.length > 0) {
+      const projectFeatures = features.map(f => ({
+        project_id: project[0].id,
+        text: f.text,
+        completed: false
+      }))
+
+      const { error: featuresInsertError } = await supabase
+        .from('project_features')
+        .insert(projectFeatures)
+
+      if (featuresInsertError) {
+        console.error('Error inserting project features:', featuresInsertError)
+      }
+    }
+
+    await removeIdea(ideaId)
+    await fetchIdeasAndOrder()
   }
 
   return (

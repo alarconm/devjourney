@@ -1,30 +1,66 @@
 "use client"
 
-import { useAppContext } from '@/app/context/AppContext'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { supabase } from '@/lib/supabase'
+
+interface Project {
+  id: string
+  title: string
+  progress: number
+  status: string
+}
+
+interface Skill {
+  id: string
+  name: string
+  level: number
+}
 
 export function LearningJourney() {
-  const { projects, completedProjects, skills } = useAppContext()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [completedProjects, setCompletedProjects] = useState<Project[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
+      .select('*')
+    if (projectsError) console.error('Error fetching projects:', projectsError)
+    else setProjects(projectsData)
+
+    const { data: completedData, error: completedError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('status', 'completed')
+    if (completedError) console.error('Error fetching completed projects:', completedError)
+    else setCompletedProjects(completedData)
+
+    const { data: skillsData, error: skillsError } = await supabase
+      .from('skills')
+      .select('*')
+    if (skillsError) console.error('Error fetching skills:', skillsError)
+    else setSkills(skillsData)
+  }
 
   const completedProjectsCount = completedProjects.length
   const level = completedProjectsCount + 1
 
   // Sort projects by progress in descending order
-  const sortedProjects = [...projects].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0))
+  const sortedProjects = [...projects].sort((a, b) => b.progress - a.progress)
 
   // Calculate XP progress based on current projects' completion
-  const totalFeatures = sortedProjects.reduce((sum, project) => sum + project.features.length, 0)
-  const completedFeatures = sortedProjects.reduce((sum, project) => sum + project.features.filter(f => f.completed).length, 0)
-  let xpProgress = totalFeatures > 0 ? (completedFeatures / totalFeatures) * 100 : 0
+  const totalProgress = sortedProjects.reduce((sum, project) => sum + project.progress, 0)
+  const averageProgress = sortedProjects.length > 0 ? totalProgress / sortedProjects.length : 0
+  let xpProgress = Math.min(averageProgress, 99)  // Cap at 99% if it would push to the next level
 
-  // Cap the progress at 99% if it would push to the next level
-  if (xpProgress >= 100 && completedProjectsCount === level - 1) {
-    xpProgress = 99
-  }
-
-  const gainedSkills = skills.filter(skill => skill.level > 0);
+  const gainedSkills = skills.filter(skill => skill.level > 0)
 
   return (
     <Card>
@@ -47,7 +83,7 @@ export function LearningJourney() {
               <div key={project.id} className="mb-2 flex items-center">
                 <div className="flex-grow mr-2 truncate">{project.title}</div>
                 <Badge className="flex-shrink-0 w-24 text-center">
-                  {(project.progress ?? 0).toFixed(0)}% Complete
+                  {project.progress.toFixed(0)}% Complete
                 </Badge>
               </div>
             ))}
