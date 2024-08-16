@@ -7,14 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 export function CompletedProjects() {
-  const { projects, moveProject, fetchProjects } = useAppContext()
+  const { projects, moveProject, fetchProjects, resetProjectFeatures, skills } = useAppContext()
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
   const completedProjects = projects.filter(p => p.status === 'completed')
 
   useEffect(() => {
     fetchProjects()
-  }, [])
+  }, [fetchProjects])
 
   const toggleExpand = (projectId: string) => {
     setExpandedProjectId(prevId => prevId === projectId ? null : projectId)
@@ -22,6 +22,7 @@ export function CompletedProjects() {
 
   const handleMoveToCurrentProjects = async (projectId: string) => {
     await moveProject(projectId, 'in_progress')
+    await resetProjectFeatures(projectId)
   }
 
   return (
@@ -39,9 +40,14 @@ export function CompletedProjects() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-2">
-                {project.associatedSkills?.map((skillId) => (
-                  <Badge key={skillId}>{skillId}</Badge>
-                ))}
+                {project.associatedSkills?.map((skillId) => {
+                  const skill = skills.find(s => s.id === skillId)
+                  return skill ? (
+                    <Badge key={skillId} variant="secondary" className="text-white">
+                      {skill.name}
+                    </Badge>
+                  ) : null
+                })}
               </div>
               <div className="flex space-x-2">
                 <Button onClick={() => toggleExpand(project.id)}>

@@ -14,7 +14,7 @@ type AppContextType = {
   addProjectFeature: (projectId: string, featureText: string) => Promise<ProjectFeature | null>
   toggleProjectFeature: (projectId: string, featureId: string) => Promise<void>
   moveProject: (projectId: string, newStatus: 'idea' | 'in_progress' | 'completed') => Promise<void>
-  addSkill: (skill: Omit<Skill, 'id'>) => Promise<Skill | null>
+  addSkill: (skillName: string) => Promise<Skill | null>
   updateSkill: (skill: Skill) => Promise<void>
   removeSkill: (id: string) => Promise<void>
   associateSkillWithProject: (projectId: string, skillId: string) => Promise<void>
@@ -22,6 +22,9 @@ type AppContextType = {
   fetchProjects: () => Promise<void>
   fetchSkills: () => Promise<void>
   fetchBrainstormingNotes: () => Promise<void>
+  removeProjectFeature: (projectId: string, featureId: string) => Promise<void>
+  resetProjectFeatures: (projectId: string) => Promise<void>
+  updateFeatureOrder: (projectId: string, features: ProjectFeature[]) => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -151,17 +154,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error) {
       console.error('Error toggling project feature:', error)
     } else {
-      setProjects(prev => prev.map(p => {
+      const updatedProjects = projects.map(p => {
         if (p.id === projectId) {
+          const updatedFeatures = p.project_features?.map(f =>
+            f.id === featureId ? { ...f, completed: !f.completed } : f
+          )
+          const completedFeatures = updatedFeatures?.filter(f => f.completed).length || 0
+          const totalFeatures = updatedFeatures?.length || 1
+          const progress = (completedFeatures / totalFeatures) * 100
+          const newStatus = progress === 100 ? 'completed' : p.status
+
           return {
             ...p,
-            project_features: p.project_features?.map(f =>
-              f.id === featureId ? { ...f, completed: !f.completed } : f
-            )
+            project_features: updatedFeatures,
+            progress,
+            status: newStatus
           }
         }
         return p
-      }))
+      })
+      setProjects(updatedProjects)
+
+      if (updatedProjects.find(p => p.id === projectId)?.status === 'completed') {
+        moveProject(projectId, 'completed')
+      }
     }
   }
 
@@ -170,18 +186,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('projects')
       .update({ status: newStatus })
       .eq('id', projectId)
-    
+
     if (error) {
       console.error('Error moving project:', error)
     } else {
-      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p))
+      setProjects(prevProjects => prevProjects.map(p => 
+        p.id === projectId ? { ...p, status: newStatus } : p
+      ))
     }
   }
 
-  const addSkill = async (skill: Omit<Skill, 'id'>) => {
+  const addSkill = async (skillName: string) => {
     const { data, error } = await supabase
       .from('skills')
-      .insert([{ ...skill, level: 1 }])
+      .insert([{ name: skillName, level: 0 }])
       .select()
     if (error) {
       console.error('Error adding skill:', error)
@@ -247,6 +265,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return data[0]
   }
 
+  const removeProjectFeature = async (projectId: string, featureId: string) => {
+    try {
+      await supabase
+        .from('project_features')
+        .delete()
+        .match({ id: featureId, project_id: projectId });
+    } catch (error) {
+      console.error("Error removing project feature:", error);
+      throw error;
+    }
+  };
+
+  const resetProjectFeatures = async (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project && project.project_features) {
+      const updatedFeatures = project.project_features.map(feature => ({ ...feature, completed: false }))
+      
+      // Update features in the database
+      for (const feature of updatedFeatures) {
+        await supabase
+          .from('project_features')
+          .update({ completed: false })
+          .eq('id', feature.id)
+      }
+
+      // Update local state
+      setProjects(prevProjects => prevProjects.map(p => 
+        p.id === projectId ? { ...p, project_features: updatedFeatures } : p
+      ))
+    }
+  }
+
+  const updateFeatureOrder = async (projectId: string, features: ProjectFeature[]) => {
+    const { error } = await supabase
+      .from('project_features')
+      .upsert(features.map((feature, index) => ({ ...feature, sort_order: index })))
+
+    if (error) {
+      console.error('Error updating feature order:', error)
+    } else {
+      setProjects(prev => prev.map(p => 
+        p.id === projectId ? { ...p, project_features: features } : p
+      ))
+    }
+  }
+
   const contextValue: AppContextType = {
     projects,
     skills,
@@ -265,6 +329,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchProjects,
     fetchSkills,
     fetchBrainstormingNotes,
+    removeProjectFeature,
+    resetProjectFeatures,
+    updateFeatureOrder,
   }
 
   return (
