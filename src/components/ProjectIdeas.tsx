@@ -23,13 +23,15 @@ export function ProjectIdeas() {
   const [archivedNotes, setArchivedNotes] = useState<Array<{ text: string, timestamp: string }>>([])
 
   const handleRemoveIdea = async (ideaId: string) => {
-    try {
-      await removeIdea(ideaId);
-      // Remove the idea from local state
-      updateIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== ideaId));
-    } catch (error) {
-      console.error('Error removing idea:', error);
-      refreshIdeas();
+    const success = await removeIdea(ideaId);
+    if (success) {
+      console.log('Idea removed successfully');
+      // The idea has been removed from the database and local state in the AppContext
+      // No need to update local state here as it's handled in the AppContext
+    } else {
+      console.error('Failed to remove idea');
+      // Optionally, you can refresh ideas here if needed
+      // await refreshIdeas();
     }
   };
 
@@ -103,6 +105,7 @@ export function ProjectIdeas() {
       const addedFeature = await addIdeaFeature(ideaId, newFeature)
       if (addedFeature) {
         setNewFeature('')
+        // No need to update local state here, as it's done in addIdeaFeature
       }
     }
   }
@@ -161,22 +164,30 @@ export function ProjectIdeas() {
       const idea = updatedIdeas.find(i => i.id === ideaId);
       if (idea && idea.features) {
         const updatedFeatures = idea.features.map((feature, index) => ({
-          idea_id: ideaId,
           text: feature,
           order: index
         }));
 
         // Update features for this idea
-        for (let i = 0; i < updatedFeatures.length; i++) {
-          await supabase
-            .from('idea_features')
-            .update({ order: i })
-            .eq('idea_id', ideaId)
-            .eq('text', updatedFeatures[i].text);
+        const { error } = await supabase
+          .from('idea_features')
+          .upsert(
+            updatedFeatures.map(feature => ({
+              idea_id: ideaId,
+              text: feature.text,
+              order: feature.order
+            })),
+            { onConflict: 'idea_id,text' }
+          );
+
+        if (error) {
+          console.error('Error updating feature order:', error);
         }
       }
     }
   };
+
+  console.log('Ideas:', ideas);
 
   return (
     <Card>
@@ -192,7 +203,7 @@ export function ProjectIdeas() {
           <Droppable droppableId="ideas" type="idea">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {ideas.filter(idea => idea && idea.id).map((idea, index) => (
+                {ideas.map((idea, index) => (
                   <Draggable key={idea.id} draggableId={idea.id} index={index}>
                     {(provided) => (
                       <div

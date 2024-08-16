@@ -34,7 +34,7 @@ interface AppContextType {
   updateProject: (updatedProject: Project | undefined) => Promise<void>
   removeProject: (id: string) => Promise<void>
   addIdea: (idea: Omit<Idea, 'id'>) => Promise<Idea>
-  removeIdea: (id: string) => Promise<void>
+  removeIdea: (id: string) => Promise<boolean>
   addProjectFeature: (projectId: string, featureText: string) => Promise<void>
   toggleProjectFeature: (projectId: string, featureId: string) => Promise<void>
   addSkill: (skill: Omit<Skill, 'id'>) => Promise<void>
@@ -49,7 +49,7 @@ interface AppContextType {
   updateIdeas: React.Dispatch<React.SetStateAction<Idea[]>>
   fetchCompletedProjects: () => Promise<void>
   refreshCurrentProjects: () => Promise<void>
-  addIdeaFeature: (ideaId: string, feature: string) => Promise<any>
+  addIdeaFeature: (ideaId: string, featureText: string) => Promise<any>
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>
   handleSkillSelect: (projectId: string, skillId: string) => Promise<void>
 }
@@ -61,144 +61,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ideas, setIdeas] = useState<Idea[]>([])
   const [skills, setSkills] = useState<Skill[]>([])
 
+  useEffect(() => {
+    fetchProjects()
+    fetchIdeas()
+    fetchSkills()
+  }, [])
+
   const fetchProjects = async () => {
     const { data, error } = await supabase
       .from('projects')
       .select('*, project_features(*)')
       .order('created_at', { ascending: false })
-      .neq('status', 'completed')
     if (error) console.error('Error fetching projects:', error)
-    else setProjects(data)
+    else setProjects(data || [])
   }
 
   const fetchIdeas = async () => {
-    try {
-      const { data: ideasData, error: ideasError } = await supabase
-        .from('ideas')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (ideasError) throw ideasError;
-
-      const { data: featuresData, error: featuresError } = await supabase
-        .from('idea_features')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (featuresError) throw featuresError;
-
-      const ideasWithFeatures = ideasData.map(idea => ({
-        ...idea,
-        features: featuresData
-          .filter(feature => feature.idea_id === idea.id)
-          .map(feature => feature.text)
-      }));
-
-      setIdeas(ideasWithFeatures);
-    } catch (error) {
-      console.error('Error fetching ideas:', error);
-    }
+    const { data, error } = await supabase
+      .from('ideas')
+      .select('*, idea_features(*)')
+      .order('created_at', { ascending: false })
+    if (error) console.error('Error fetching ideas:', error)
+    else setIdeas(data?.map(idea => ({
+      ...idea,
+      features: idea.idea_features.map(f => f.text)
+    })) || [])
   }
 
   const fetchSkills = async () => {
-    const { data, error } = await supabase.from('skills').select('*')
+    const { data, error } = await supabase
+      .from('skills')
+      .select('*')
+      .order('name', { ascending: true })
     if (error) console.error('Error fetching skills:', error)
-    else setSkills(data)
+    else setSkills(data || [])
   }
-
-  const fetchCompletedProjects = async () => {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-    if (error) console.error('Error fetching completed projects:', error.message)
-    else setProjects(prevProjects => [...prevProjects, ...data])
-  }
-
-  const refreshCurrentProjects = async () => {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .neq('status', 'completed')
-
-    if (error) {
-      console.error('Error refreshing projects:', error)
-    } else {
-      setProjects(data)
-    }
-  }
-
-  useEffect(() => {
-    fetchIdeas()
-    fetchProjects()
-    fetchSkills()
-
-    const ideasChannel = supabase.channel('ideas-changes')
-    const projectsChannel = supabase.channel('projects-changes')
-    const skillsChannel = supabase.channel('skills-changes')
-
-    ideasChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setIdeas(prevIdeas => [...prevIdeas, payload.new as Idea])
-        } else if (payload.eventType === 'DELETE') {
-          setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== payload.old.id))
-        } else if (payload.eventType === 'UPDATE') {
-          setIdeas(prevIdeas => prevIdeas.map(idea => idea.id === payload.new.id ? payload.new as Idea : idea))
-        }
-      })
-      .subscribe()
-
-    projectsChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setProjects(prevProjects => [...prevProjects, payload.new as Project])
-        } else if (payload.eventType === 'DELETE') {
-          setProjects(prevProjects => prevProjects.filter(project => project.id !== payload.old.id))
-        } else if (payload.eventType === 'UPDATE') {
-          setProjects(prevProjects => prevProjects.map(project => project.id === payload.new.id ? payload.new as Project : project))
-        }
-      })
-      .subscribe()
-
-    skillsChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'skills' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setSkills(prevSkills => [...prevSkills, payload.new as Skill])
-        } else if (payload.eventType === 'DELETE') {
-          setSkills(prevSkills => prevSkills.filter(skill => skill.id !== payload.old.id))
-        } else if (payload.eventType === 'UPDATE') {
-          setSkills(prevSkills => prevSkills.map(skill => skill.id === payload.new.id ? payload.new as Skill : skill))
-        }
-      })
-      .subscribe()
-
-    return () => {
-      ideasChannel.unsubscribe()
-      projectsChannel.unsubscribe()
-      skillsChannel.unsubscribe()
-    }
-  }, [])
 
   const addProject = async (project: Omit<Project, 'id' | 'progress' | 'status'>) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('projects')
       .insert([{ ...project, progress: 0, status: 'in_progress' }])
+      .select()
     if (error) console.error('Error adding project:', error)
+    else setProjects(prev => [data[0], ...prev])
   }
 
-  const updateProject = async (updatedProject: Project | undefined) => {
-    if (!updatedProject || !updatedProject.id) {
-      console.error('Invalid project data for update')
-      return
-    }
+  const updateProject = async (updatedProject: Project) => {
     const { error } = await supabase
       .from('projects')
       .update(updatedProject)
       .eq('id', updatedProject.id)
     if (error) console.error('Error updating project:', error)
+    else setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p))
   }
 
   const removeProject = async (id: string) => {
@@ -207,6 +121,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .delete()
       .eq('id', id)
     if (error) console.error('Error removing project:', error)
+    else setProjects(prev => prev.filter(p => p.id !== id))
   }
 
   const addIdea = async (idea: Omit<Idea, 'id'>) => {
@@ -218,66 +133,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error adding idea:', error)
       return null
     }
-    setIdeas(prevIdeas => [...prevIdeas, data[0]])
-    return data[0]
-  }
-
-  const addIdeaFeature = async (ideaId: string, feature: string) => {
-    const { data: existingFeatures, error: fetchError } = await supabase
-      .from('idea_features')
-      .select('order')
-      .eq('idea_id', ideaId)
-      .order('order', { ascending: false })
-      .limit(1);
-
-    if (fetchError) {
-      console.error('Error fetching existing features:', fetchError);
-      return null;
-    }
-
-    const newOrder = existingFeatures.length > 0 ? existingFeatures[0].order + 1 : 0;
-
-    const { data, error } = await supabase
-      .from('idea_features')
-      .insert([{ idea_id: ideaId, text: feature, order: newOrder }])
-      .select();
-
-    if (error) {
-      console.error('Error adding idea feature:', error);
-      return null;
-    }
-
-    setIdeas(prevIdeas => prevIdeas.map(idea => 
-      idea.id === ideaId 
-        ? { ...idea, features: [...(idea.features || []), feature] }
-        : idea
-    ));
-
-    return data[0];
+    const newIdea = { ...data[0], features: [] }
+    setIdeas(prev => [newIdea, ...prev])
+    return newIdea
   }
 
   const removeIdea = async (id: string) => {
-    try {
-      // First, delete all features associated with the idea
-      await supabase
-        .from('idea_features')
-        .delete()
-        .eq('idea_id', id);
-
-      // Then, delete the idea itself
-      const { error } = await supabase
-        .from('ideas')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // Update local state
-      setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== id));
-    } catch (error) {
-      console.error('Error removing idea:', error);
-      throw error;
+    const { error } = await supabase
+      .from('ideas')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      console.error('Error removing idea:', error)
+      return false
     }
+    setIdeas(prev => prev.filter(i => i.id !== id))
+    return true
   }
 
   const addProjectFeature = async (projectId: string, featureText: string) => {
@@ -285,91 +156,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('project_features')
       .insert([{ project_id: projectId, text: featureText, completed: false }])
       .select()
-    if (error) {
-      console.error('Error adding project feature:', error)
-      return null
+    if (error) console.error('Error adding project feature:', error)
+    else {
+      setProjects(prev => prev.map(p => {
+        if (p.id === projectId) {
+          return { ...p, project_features: [...(p.project_features || []), data[0]] }
+        }
+        return p
+      }))
+      return data[0]
     }
-    return data[0]
   }
 
   const toggleProjectFeature = async (projectId: string, featureId: string) => {
-    const { data, error } = await supabase
+    const project = projects.find(p => p.id === projectId)
+    const feature = project?.project_features?.find(f => f.id === featureId)
+    if (!feature) return
+
+    const { error } = await supabase
       .from('project_features')
-      .select('completed')
+      .update({ completed: !feature.completed })
       .eq('id', featureId)
-      .single()
-    
-    if (error) {
-      console.error('Error fetching feature:', error)
-      return
-    }
-
-    const { error: updateError } = await supabase
-      .from('project_features')
-      .update({ completed: !data.completed })
-      .eq('id', featureId)
-    
-    if (updateError) {
-      console.error('Error toggling project feature:', updateError)
-    }
-  }
-
-  const addSkill = async (skill: Omit<Skill, 'id'>) => {
-    const { data, error } = await supabase
-      .from('skills')
-      .insert([skill])
-      .select()
-    if (error) console.error('Error adding skill:', error)
+    if (error) console.error('Error toggling project feature:', error)
     else {
-      setSkills([...skills, data[0]])
+      setProjects(prev => prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            project_features: p.project_features?.map(f =>
+              f.id === featureId ? { ...f, completed: !f.completed } : f
+            )
+          }
+        }
+        return p
+      }))
     }
-  }
-
-  const updateSkill = async (updatedSkill: Skill) => {
-    const { error } = await supabase
-      .from('skills')
-      .update(updatedSkill)
-      .eq('id', updatedSkill.id)
-    if (error) console.error('Error updating skill:', error)
-    else {
-      setSkills(skills.map(s => s.id === updatedSkill.id ? updatedSkill : s))
-    }
-  }
-
-  const removeSkill = async (id: string) => {
-    const { error } = await supabase
-      .from('skills')
-      .delete()
-      .eq('id', id)
-    if (error) console.error('Error removing skill:', error)
-    else {
-      setSkills(skills.filter(s => s.id !== id))
-    }
-  }
-
-  const associateSkillWithProject = async (projectId: string, skillId: string) => {
-    const { error } = await supabase
-      .from('project_skills')
-      .insert([{ project_id: projectId, skill_id: skillId }])
-    if (error) console.error('Error associating skill with project:', error)
   }
 
   const moveProjectToIdea = async (projectId: string) => {
-    const project = projects.find(p => p.id === projectId)
-    if (!project) return
+    const projectToMove = projects.find(p => p.id === projectId)
+    if (!projectToMove) return
 
-    const { data: idea, error: ideaError } = await supabase
+    const { data: newIdea, error: insertError } = await supabase
       .from('ideas')
-      .insert([{ title: project.title, description: project.description }])
+      .insert({
+        title: projectToMove.title,
+        description: projectToMove.description,
+      })
       .select()
+      .single()
 
-    if (ideaError) {
-      console.error('Error creating idea:', ideaError)
+    if (insertError) {
+      console.error('Error moving project to idea:', insertError)
       return
     }
 
-    await removeProject(projectId)
-    setIdeas(prevIdeas => [...prevIdeas, idea[0]])
+    if (projectToMove.project_features) {
+      const ideaFeatures = projectToMove.project_features.map(feature => ({
+        idea_id: newIdea.id,
+        text: feature.text,
+      }))
+
+      const { error: featureError } = await supabase
+        .from('idea_features')
+        .insert(ideaFeatures)
+
+      if (featureError) {
+        console.error('Error moving project features to idea:', featureError)
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+
+    if (deleteError) {
+      console.error('Error deleting project:', deleteError)
+      return
+    }
+
+    setProjects(prev => prev.filter(p => p.id !== projectId))
+    setIdeas(prev => [{ ...newIdea, features: projectToMove.project_features?.map(f => f.text) || [] }, ...prev])
   }
 
   const moveIdeaToProject = async (ideaId: string) => {
@@ -386,7 +254,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Move features from idea to project
     if (idea.features && idea.features.length > 0) {
       const projectFeatures = idea.features.map(feature => ({
         project_id: project[0].id,
@@ -404,7 +271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     await removeIdea(ideaId)
-    setProjects(prevProjects => [...prevProjects, {...project[0], project_features: idea.features.map(feature => ({
+    setProjects(prev => [...prev, {...project[0], project_features: idea.features.map(feature => ({
       id: '', // This will be generated by the database
       text: feature,
       completed: false
@@ -422,21 +289,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeIdea,
     addProjectFeature,
     toggleProjectFeature,
-    addSkill,
-    updateSkill,
-    removeSkill,
-    associateSkillWithProject,
+    addSkill: () => {},
+    updateSkill: () => {},
+    removeSkill: () => {},
+    associateSkillWithProject: () => {},
     fetchProjects,
     fetchIdeas,
     fetchSkills,
     moveProjectToIdea,
     moveIdeaToProject,
     updateIdeas: setIdeas,
-    fetchCompletedProjects,
-    refreshCurrentProjects,
-    addIdeaFeature,
+    fetchCompletedProjects: () => {},
+    refreshCurrentProjects: () => {},
+    addIdeaFeature: () => {},
     setProjects,
-    handleSkillSelect: associateSkillWithProject,
+    handleSkillSelect: () => {},
   }
 
   return (

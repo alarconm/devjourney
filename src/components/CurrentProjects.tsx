@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { RealtimeChannel } from '@supabase/supabase-js'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills, moveProjectToIdea, moveIdeaToProject, refreshCurrentProjects, setProjects, handleSkillSelect } = useAppContext()
+  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills, moveProjectToIdea, refreshCurrentProjects, setProjects, handleSkillSelect } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
@@ -26,22 +26,10 @@ export function CurrentProjects() {
 
   const handleToggleProjectFeature = async (projectId: string, featureId: string) => {
     await toggleProjectFeature(projectId, featureId);
-    setProjects(prevProjects => prevProjects.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          project_features: p.project_features?.map(f => 
-            f.id === featureId ? { ...f, completed: !f.completed } : f
-          )
-        };
-      }
-      return p;
-    }));
   };
 
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) {
-      // Feature was dragged outside the list
       if (result.type === 'feature') {
         const [projectId, featureId] = result.draggableId.split('-');
         await handleRemoveFeature(projectId, featureId);
@@ -54,25 +42,14 @@ export function CurrentProjects() {
     const projectId = result.source.droppableId.split('-')[1];
 
     if (result.type === 'feature') {
-      setProjects((prevProjects: Project[]) => prevProjects.map((p: Project) => {
-        if (p.id === projectId) {
-          const newFeatures = Array.from(p.project_features || []);
-          const [reorderedItem] = newFeatures.splice(sourceIndex, 1);
-          newFeatures.splice(destIndex, 0, reorderedItem);
-          return { ...p, project_features: newFeatures };
-        }
-        return p;
-      }));
-
       const projectToUpdate = projects.find(p => p.id === projectId);
-      if (projectToUpdate) {
-        const updatedFeatures = projectToUpdate.project_features?.map((feature, index) => ({
-          ...feature,
-          order: index
-        }));
-        await updateProject({ ...projectToUpdate, project_features: updatedFeatures });
-      } else {
-        console.error('Project not found for update');
+      if (projectToUpdate && projectToUpdate.project_features) {
+        const newFeatures = Array.from(projectToUpdate.project_features);
+        const [reorderedItem] = newFeatures.splice(sourceIndex, 1);
+        newFeatures.splice(destIndex, 0, reorderedItem);
+        
+        const updatedProject = { ...projectToUpdate, project_features: newFeatures };
+        await updateProject(updatedProject);
       }
     }
   };
@@ -86,11 +63,11 @@ export function CurrentProjects() {
     if (error) {
       console.error('Error removing feature:', error);
     } else {
-      setProjects((prevProjects: Project[]) => prevProjects.map((p: Project) => {
+      setProjects(prevProjects => prevProjects.map(p => {
         if (p.id === projectId) {
           return {
             ...p,
-            project_features: p.project_features?.filter((f: { id: string }) => f.id !== featureId)
+            project_features: p.project_features?.filter(f => f.id !== featureId)
           };
         }
         return p;
@@ -102,19 +79,14 @@ export function CurrentProjects() {
     if (newFeature.trim()) {
       const addedFeature = await addProjectFeature(projectId, newFeature.trim())
       if (addedFeature) {
-        setProjects(prevProjects => prevProjects.map(p => {
-          if (p.id === projectId) {
-            return {
-              ...p,
-              project_features: [...(p.project_features || []), addedFeature]
-            }
-          }
-          return p
-        }))
         setNewFeature('')
       }
     }
   }
+
+  const handleMoveToIdea = async (projectId: string) => {
+    await moveProjectToIdea(projectId);
+  };
 
   useEffect(() => {
     const projectsChannel = supabase.channel('projects-changes');
@@ -191,7 +163,7 @@ export function CurrentProjects() {
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => moveProjectToIdea(project.id)}>
+                                    <AlertDialogAction onClick={() => handleMoveToIdea(project.id)}>
                                       Move to Ideas
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
