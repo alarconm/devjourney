@@ -1,54 +1,20 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { supabase } from '@/lib/supabase'
-
-interface Project {
-  id: string
-  title: string
-  progress: number
-  status: string
-}
-
-interface Skill {
-  id: string
-  name: string
-  level: number
-}
+import { useAppContext } from '@/app/context/AppContext'
 
 export function LearningJourney() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [completedProjects, setCompletedProjects] = useState<Project[]>([])
-  const [skills, setSkills] = useState<Skill[]>([])
+  const { projects, skills, fetchProjects, fetchSkills } = useAppContext()
 
   useEffect(() => {
-    fetchData()
+    fetchProjects()
+    fetchSkills()
   }, [])
 
-  const fetchData = async () => {
-    const { data: projectsData, error: projectsError } = await supabase
-      .from('projects')
-      .select('*')
-    if (projectsError) console.error('Error fetching projects:', projectsError)
-    else setProjects(projectsData)
-
-    const { data: completedData, error: completedError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('status', 'completed')
-    if (completedError) console.error('Error fetching completed projects:', completedError)
-    else setCompletedProjects(completedData)
-
-    const { data: skillsData, error: skillsError } = await supabase
-      .from('skills')
-      .select('*')
-    if (skillsError) console.error('Error fetching skills:', skillsError)
-    else setSkills(skillsData)
-  }
-
+  const completedProjects = projects.filter(p => p.status === 'completed')
   const completedProjectsCount = completedProjects.length
   const level = completedProjectsCount + 1
 

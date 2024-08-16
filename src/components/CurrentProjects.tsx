@@ -2,122 +2,92 @@
 
 import { useState, useEffect } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
-import { Project } from '@/app/context/AppContext'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { Checkbox } from "@/components/ui/checkbox"
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { SkillSelector } from './SkillSelector'
 import { Badge } from "@/components/ui/badge"
-import { supabase } from '@/lib/supabase'
-import { RealtimeChannel } from '@supabase/supabase-js'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, skills, moveProjectToIdea, refreshCurrentProjects, setProjects, handleSkillSelect } = useAppContext()
+  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, moveProject, skills, associateSkillWithProject, fetchProjects } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
+  const currentProjects = projects.filter(p => p.status === 'in_progress')
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
   const toggleExpand = (projectId: string) => {
-    setExpandedProjectId(prevId => prevId === projectId ? null : projectId);
-  };
+    setExpandedProjectId(prevId => prevId === projectId ? null : projectId)
+  }
 
   const handleToggleProjectFeature = async (projectId: string, featureId: string) => {
-    await toggleProjectFeature(projectId, featureId);
-  };
-
-  const onDragEnd = async (result: DropResult) => {
-    if (!result.destination) {
-      if (result.type === 'feature') {
-        const [projectId, featureId] = result.draggableId.split('-');
-        await handleRemoveFeature(projectId, featureId);
-      }
-      return;
-    }
-
-    const sourceIndex = result.source.index;
-    const destIndex = result.destination.index;
-    const projectId = result.source.droppableId.split('-')[1];
-
-    if (result.type === 'feature') {
-      const projectToUpdate = projects.find(p => p.id === projectId);
-      if (projectToUpdate && projectToUpdate.project_features) {
-        const newFeatures = Array.from(projectToUpdate.project_features);
-        const [reorderedItem] = newFeatures.splice(sourceIndex, 1);
-        newFeatures.splice(destIndex, 0, reorderedItem);
-        
-        const updatedProject = { ...projectToUpdate, project_features: newFeatures };
-        await updateProject(updatedProject);
-      }
-    }
-  };
-
-  const handleRemoveFeature = async (projectId: string, featureId: string) => {
-    const { error } = await supabase
-      .from('project_features')
-      .delete()
-      .eq('id', featureId);
-
-    if (error) {
-      console.error('Error removing feature:', error);
-    } else {
-      setProjects(prevProjects => prevProjects.map(p => {
-        if (p.id === projectId) {
-          return {
-            ...p,
-            project_features: p.project_features?.filter(f => f.id !== featureId)
-          };
-        }
-        return p;
-      }));
-    }
-  };
+    await toggleProjectFeature(projectId, featureId)
+  }
 
   const handleAddFeature = async (projectId: string) => {
     if (newFeature.trim()) {
-      const addedFeature = await addProjectFeature(projectId, newFeature.trim())
-      if (addedFeature) {
-        setNewFeature('')
-      }
+      await addProjectFeature(projectId, newFeature.trim())
+      setNewFeature('')
     }
   }
 
   const handleMoveToIdea = async (projectId: string) => {
-    await moveProjectToIdea(projectId);
-  };
+    await moveProject(projectId, 'idea')
+  }
 
-  useEffect(() => {
-    const projectsChannel = supabase.channel('projects-changes');
-    const featuresChannel = supabase.channel('features-changes');
+  const handleMoveToCompleted = async (projectId: string) => {
+    await moveProject(projectId, 'completed')
+  }
 
-    projectsChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, refreshCurrentProjects)
-      .subscribe();
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return
 
-    featuresChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_features' }, refreshCurrentProjects)
-      .subscribe();
+    const sourceIndex = result.source.index
+    const destIndex = result.destination.index
+    const projectId = result.draggableId.split('-')[0]
 
-    return () => {
-      projectsChannel.unsubscribe();
-      featuresChannel.unsubscribe();
+    if (result.type === 'feature') {
+      const projectToUpdate = currentProjects.find(p => p.id === projectId)
+      if (projectToUpdate && projectToUpdate.project_features) {
+        const newFeatures = Array.from(projectToUpdate.project_features)
+        const [reorderedItem] = newFeatures.splice(sourceIndex, 1)
+        newFeatures.splice(destIndex, 0, reorderedItem)
+        
+        const updatedProject = { ...projectToUpdate, project_features: newFeatures }
+        await updateProject(updatedProject)
+      }
+    } else if (result.type === 'project') {
+      const updatedProjects = Array.from(currentProjects)
+      const [reorderedItem] = updatedProjects.splice(sourceIndex, 1)
+      updatedProjects.splice(destIndex, 0, reorderedItem)
+
+      // Update the sort_order of projects in the database
+      for (let i = 0; i < updatedProjects.length; i++) {
+        await updateProject({ ...updatedProjects[i], sort_order: i })
+      }
+
+      // Fetch projects again to update the local state with the new order
+      fetchProjects()
     }
-  }, [refreshCurrentProjects])
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-primary">Current Projects</CardTitle>
-        <CardDescription>Track your ongoing projects</CardDescription>
+        <CardDescription>Your ongoing projects</CardDescription>
       </CardHeader>
       <CardContent>
         <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="currentProjects" type="project">
+          <Droppable droppableId="current-projects" type="project">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {projects.map((project, index) => (
+                {currentProjects.map((project, index) => (
                   <Draggable key={project.id} draggableId={project.id} index={index}>
                     {(provided) => (
                       <div
@@ -132,27 +102,22 @@ export function CurrentProjects() {
                             <CardDescription>{project.description}</CardDescription>
                           </CardHeader>
                           <CardContent>
-                            <div className="flex items-center mb-2">
-                              <Progress value={project.progress} className="flex-grow mr-2" />
-                              <span className="text-sm text-muted-foreground">{Math.round(project.progress)}%</span>
+                            <Progress value={project.progress} className="mb-4" />
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              {project.associatedSkills?.map((skillId) => {
+                                const skill = skills.find(s => s.id === skillId)
+                                return skill ? (
+                                  <Badge key={skillId} variant="secondary">{skill.name}</Badge>
+                                ) : null
+                              })}
                             </div>
-                            <div className="text-sm text-foreground mb-2">
-                              <p className="font-semibold mb-1">Next Feature to Implement:</p>
-                              {project.project_features && project.project_features.find(f => !f.completed) && (
-                                <div className="p-2 bg-secondary/10 rounded">
-                                  <p>{project.project_features.find(f => !f.completed)?.text}</p>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button onClick={() => toggleExpand(project.id)}>
+                            <div className="flex space-x-2 mb-4">
+                              <Button onClick={() => toggleExpand(project.id)} variant="gradient">
                                 {expandedProjectId === project.id ? 'Hide Details' : 'Show Details'}
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button variant="gradient">
-                                    Move to Ideas
-                                  </Button>
+                                  <Button variant="gradient">Move to Ideas</Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
@@ -169,28 +134,27 @@ export function CurrentProjects() {
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
+                              <Button onClick={() => handleMoveToCompleted(project.id)}>Mark as Completed</Button>
                             </div>
                             {expandedProjectId === project.id && (
-                              <div className="mt-2">
+                              <div>
+                                <h4 className="font-semibold mb-2">Features:</h4>
                                 <Droppable droppableId={`features-${project.id}`} type="feature">
-                                  {(provided, snapshot) => (
-                                    <ul
-                                      {...provided.droppableProps}
-                                      ref={provided.innerRef}
-                                      className={`space-y-2 min-h-[100px] ${snapshot.isDraggingOver ? 'bg-secondary/50' : ''}`}
-                                    >
-                                      {project.project_features && project.project_features.map((feature, index) => (
-                                        <Draggable key={`${project.id}-${feature.id}`} draggableId={`${project.id}-${feature.id}`} index={index}>
-                                          {(provided, snapshot) => (
+                                  {(provided) => (
+                                    <ul {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                      {project.project_features?.map((feature, index) => (
+                                        <Draggable key={feature.id} draggableId={`${project.id}-${feature.id}`} index={index}>
+                                          {(provided) => (
                                             <li
                                               ref={provided.innerRef}
                                               {...provided.draggableProps}
                                               {...provided.dragHandleProps}
-                                              className={`flex items-center bg-secondary/10 p-2 rounded ${snapshot.isDragging ? 'opacity-50' : ''}`}
+                                              className="flex items-center p-2 bg-secondary/10 rounded"
                                             >
-                                              <Checkbox
+                                              <input
+                                                type="checkbox"
                                                 checked={feature.completed}
-                                                onCheckedChange={() => handleToggleProjectFeature(project.id, feature.id)}
+                                                onChange={() => handleToggleProjectFeature(project.id, feature.id)}
                                                 className="mr-2"
                                               />
                                               <span className={feature.completed ? 'line-through' : ''}>{feature.text}</span>
@@ -209,22 +173,7 @@ export function CurrentProjects() {
                                     placeholder="Add new feature"
                                     className="mr-2"
                                   />
-                                  <Button onClick={() => handleAddFeature(project.id)}>Add</Button>
-                                </div>
-                                <div className="mt-4">
-                                  <h4 className="text-sm font-semibold mb-2">Associated Skills</h4>
-                                  <div className="flex flex-wrap gap-2 mb-2">
-                                    {project.associatedSkills && project.associatedSkills.map((skillId) => {
-                                      const skill = skills.find(s => s.id === skillId)
-                                      return skill ? (
-                                        <Badge key={skillId}>{skill.name}</Badge>
-                                      ) : null
-                                    })}
-                                  </div>
-                                  <SkillSelector
-                                    selectedSkills={project.associatedSkills || []}
-                                    onSkillSelect={(skillId) => handleSkillSelect(project.id, skillId)}
-                                  />
+                                  <Button onClick={() => handleAddFeature(project.id)} variant="gradient">Add</Button>
                                 </div>
                               </div>
                             )}
