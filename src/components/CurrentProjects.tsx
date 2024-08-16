@@ -100,8 +100,19 @@ export function CurrentProjects() {
 
   const handleAddFeature = async (projectId: string) => {
     if (newFeature.trim()) {
-      await addProjectFeature(projectId, newFeature.trim())
-      setNewFeature('')
+      const addedFeature = await addProjectFeature(projectId, newFeature.trim())
+      if (addedFeature) {
+        setProjects(prevProjects => prevProjects.map(p => {
+          if (p.id === projectId) {
+            return {
+              ...p,
+              project_features: [...(p.project_features || []), addedFeature]
+            }
+          }
+          return p
+        }))
+        setNewFeature('')
+      }
     }
   }
 

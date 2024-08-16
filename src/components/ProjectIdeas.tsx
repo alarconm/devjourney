@@ -126,20 +126,55 @@ export function ProjectIdeas() {
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
 
-    const items = Array.from(ideas);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    const sourceDroppableId = result.source.droppableId;
+    const destinationDroppableId = result.destination.droppableId;
 
-    updateIdeas(items);
+    if (sourceDroppableId === 'ideas' && destinationDroppableId === 'ideas') {
+      // Reordering ideas
+      const items = Array.from(ideas);
+      const [reorderedItem] = items.splice(result.source.index, 1);
+      items.splice(result.destination.index, 0, reorderedItem);
+      updateIdeas(items);
 
-    // Update order in the database
-    const { error } = await supabase
-      .from('ideas')
-      .update({ order: result.destination.index })
-      .eq('id', reorderedItem.id);
+      // Update idea order in the database
+      for (let i = 0; i < items.length; i++) {
+        await supabase
+          .from('ideas')
+          .update({ order: i })
+          .eq('id', items[i].id);
+      }
+    } else if (sourceDroppableId.startsWith('features-') && destinationDroppableId.startsWith('features-')) {
+      // Reordering features within an idea
+      const ideaId = sourceDroppableId.split('-')[1];
+      const updatedIdeas = ideas.map(idea => {
+        if (idea.id === ideaId) {
+          const updatedFeatures = Array.from(idea.features || []);
+          const [reorderedFeature] = updatedFeatures.splice(result.source.index, 1);
+          updatedFeatures.splice(result.destination.index, 0, reorderedFeature);
+          return { ...idea, features: updatedFeatures };
+        }
+        return idea;
+      });
+      updateIdeas(updatedIdeas);
 
-    if (error) {
-      console.error('Error updating idea order:', error);
+      // Update feature order in the database
+      const idea = updatedIdeas.find(i => i.id === ideaId);
+      if (idea && idea.features) {
+        const updatedFeatures = idea.features.map((feature, index) => ({
+          idea_id: ideaId,
+          text: feature,
+          order: index
+        }));
+
+        // Update features for this idea
+        for (let i = 0; i < updatedFeatures.length; i++) {
+          await supabase
+            .from('idea_features')
+            .update({ order: i })
+            .eq('idea_id', ideaId)
+            .eq('text', updatedFeatures[i].text);
+        }
+      }
     }
   };
 
@@ -157,7 +192,7 @@ export function ProjectIdeas() {
           <Droppable droppableId="ideas" type="idea">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {ideas.map((idea, index) => (
+                {ideas.filter(idea => idea && idea.id).map((idea, index) => (
                   <Draggable key={idea.id} draggableId={idea.id} index={index}>
                     {(provided) => (
                       <div

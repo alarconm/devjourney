@@ -72,15 +72,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const fetchIdeas = async () => {
-    const { data, error } = await supabase
-      .from('ideas')
-      .select('*, idea_features(*)')
-      .order('created_at', { ascending: false })
-    if (error) console.error('Error fetching ideas:', error)
-    else setIdeas(data.map(idea => ({
-      ...idea,
-      features: idea.idea_features.map(feature => feature.text)
-    })))
+    try {
+      const { data: ideasData, error: ideasError } = await supabase
+        .from('ideas')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (ideasError) throw ideasError;
+
+      const { data: featuresData, error: featuresError } = await supabase
+        .from('idea_features')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (featuresError) throw featuresError;
+
+      const ideasWithFeatures = ideasData.map(idea => ({
+        ...idea,
+        features: featuresData
+          .filter(feature => feature.idea_id === idea.id)
+          .map(feature => feature.text)
+      }));
+
+      setIdeas(ideasWithFeatures);
+    } catch (error) {
+      console.error('Error fetching ideas:', error);
+    }
   }
 
   const fetchSkills = async () => {
@@ -206,20 +223,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const addIdeaFeature = async (ideaId: string, feature: string) => {
+    const { data: existingFeatures, error: fetchError } = await supabase
+      .from('idea_features')
+      .select('order')
+      .eq('idea_id', ideaId)
+      .order('order', { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error fetching existing features:', fetchError);
+      return null;
+    }
+
+    const newOrder = existingFeatures.length > 0 ? existingFeatures[0].order + 1 : 0;
+
     const { data, error } = await supabase
       .from('idea_features')
-      .insert([{ idea_id: ideaId, text: feature }])
-      .select()
+      .insert([{ idea_id: ideaId, text: feature, order: newOrder }])
+      .select();
+
     if (error) {
-      console.error('Error adding idea feature:', error)
-      return null
+      console.error('Error adding idea feature:', error);
+      return null;
     }
+
     setIdeas(prevIdeas => prevIdeas.map(idea => 
       idea.id === ideaId 
         ? { ...idea, features: [...(idea.features || []), feature] }
         : idea
-    ))
-    return data[0]
+    ));
+
+    return data[0];
   }
 
   const removeIdea = async (id: string) => {
@@ -250,7 +284,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from('project_features')
       .insert([{ project_id: projectId, text: featureText, completed: false }])
-    if (error) console.error('Error adding project feature:', error)
+      .select()
+    if (error) {
+      console.error('Error adding project feature:', error)
+      return null
+    }
+    return data[0]
   }
 
   const toggleProjectFeature = async (projectId: string, featureId: string) => {
