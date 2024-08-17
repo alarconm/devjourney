@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Project, ProjectFeature, Skill, BrainstormingNote } from '@/types/project'
+import { Project, ProjectFeature, Skill, BrainstormingNote } from '@/types'
 
 type AppContextType = {
   projects: Project[]
@@ -51,7 +51,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else {
       const projectsWithSkills = data.map(project => ({
         ...project,
-        associatedSkills: project.project_skills.map((ps: { skill_id: string }) => ps.skill_id)
+        associatedSkills: project.project_skills.map(ps => ps.skill_id)
       }))
       setProjects(projectsWithSkills)
       setIdeas(projectsWithSkills.filter(p => p.status === 'idea'))
@@ -185,7 +185,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     if (updatedProject) {
       if (updatedProject.progress === 100) {
-        await moveProject(projectId, 'completed')
+        const movedProject = await moveProject(projectId, 'completed')
+        if (movedProject) {
+          setProjects(prev => prev.map(p => p.id === projectId ? movedProject : p))
+        }
       } else {
         setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p))
       }
@@ -229,7 +232,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('projects')
       .update({ status: newStatus })
       .eq('id', projectId)
-      .select()
+      .select('*, project_features(*)')
       .single()
 
     if (error) {
@@ -241,7 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await resetProjectFeatures(projectId)
     }
 
-    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p))
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...data } : p))
 
     return data
   }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Project, ProjectFeature } from '../types/project'
 
 export function CompletedProjects() {
-  const { projects, moveProject, resetProjectFeatures, skills } = useAppContext()
+  const { projects, moveProject, resetProjectFeatures, skills, fetchProjects, setProjects } = useAppContext()
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
   const completedProjects = projects.filter(p => p.status === 'completed')
@@ -18,7 +18,11 @@ export function CompletedProjects() {
   }
 
   const handleMoveToCurrentProjects = async (projectId: string) => {
-    await moveProject(projectId, 'in_progress')
+    const movedProject = await moveProject(projectId, 'in_progress')
+    if (movedProject) {
+      setProjects(prev => prev.map(p => p.id === projectId ? movedProject : p))
+    }
+    fetchProjects() // Refresh all projects to ensure consistency
   }
 
   useEffect(() => {

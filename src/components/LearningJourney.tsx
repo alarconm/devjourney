@@ -10,7 +10,7 @@ export function LearningJourney() {
   const { projects, skills, fetchProjects, fetchSkills } = useAppContext();
   const [inProgressProjects, setInProgressProjects] = useState([]);
   const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
-  const [averageProgress, setAverageProgress] = useState(0);
+  const [totalProgress, setTotalProgress] = useState(0);
 
   useEffect(() => {
     fetchProjects();
@@ -20,15 +20,18 @@ export function LearningJourney() {
   useEffect(() => {
     const currentProjects = projects.filter(p => p.status === 'in_progress');
     setInProgressProjects(currentProjects);
-    setCompletedProjectsCount(projects.filter(p => p.status === 'completed').length);
+    const completedProjects = projects.filter(p => p.status === 'completed');
+    setCompletedProjectsCount(completedProjects.length);
 
-    const totalProgress = currentProjects.reduce((sum, project) => sum + project.progress, 0);
-    const calculatedAverageProgress = currentProjects.length > 0 ? totalProgress / currentProjects.length : 0;
-    setAverageProgress(Math.min(calculatedAverageProgress, 99));
+    const totalFeatures = currentProjects.reduce((sum, project) => sum + (project.project_features?.length || 0), 0);
+    const completedFeatures = currentProjects.reduce((sum, project) => sum + (project.project_features?.filter(f => f.completed)?.length || 0), 0);
+    
+    const calculatedTotalProgress = totalFeatures > 0 ? (completedFeatures / totalFeatures) * 100 : 0;
+    setTotalProgress(Math.min(calculatedTotalProgress, 99));
   }, [projects]);
 
-  const level = Math.floor(completedProjectsCount / 5) + 1;
-  const xpProgress = averageProgress;
+  const level = completedProjectsCount;
+  const xpProgress = totalProgress;
 
   const gainedSkills = skills.filter(skill => 
     projects.some(project => 

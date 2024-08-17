@@ -12,15 +12,14 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/lib/supabase'
-import { RealtimeChannel } from '@supabase/supabase-js'
 import { Project, ProjectFeature } from '../types/project'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, moveProject, skills, associateSkillWithProject, fetchProjects, updateFeatureOrder, fetchSkills, setProjects } = useAppContext()
+  const { projects, addProjectFeature, toggleProjectFeature, moveProject, skills, associateSkillWithProject, fetchProjects, updateFeatureOrder, fetchSkills, setProjects } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
-  const currentProjects = projects.filter(p => p.status === 'in_progress')
+  const currentProjects = projects.filter(p => p.status === 'in_progress').sort((a, b) => a.sort_order - b.sort_order)
 
   const toggleExpand = (projectId: string) => {
     setExpandedProjectId(prevId => prevId === projectId ? null : projectId)
@@ -28,9 +27,14 @@ export function CurrentProjects() {
 
   const handleToggleProjectFeature = async (projectId: string, featureId: string) => {
     const updatedProject = await toggleProjectFeature(projectId, featureId)
-    if (updatedProject && updatedProject.status === 'completed') {
-      setProjects(prev => prev.filter(p => p.id !== projectId))
+    if (updatedProject) {
+      if (updatedProject.status === 'completed') {
+        setProjects(prev => prev.filter(p => p.id !== projectId))
+      } else {
+        setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p))
+      }
     }
+    fetchProjects() // Refresh all projects to ensure consistency
   }
 
   const handleAddFeature = async (projectId: string) => {
@@ -49,39 +53,71 @@ export function CurrentProjects() {
   }
 
   const onDragEnd = async (result: DropResult) => {
-    if (!result.destination) return
+    if (!result.destination) return;
 
-    const sourceIndex = result.source.index
-    const destIndex = result.destination.index
-    const projectId = result.draggableId.split('-')[0]
+    const sourceIndex = result.source.index;
+    const destIndex = result.destination.index;
 
-    if (result.type === 'feature') {
-      const projectToUpdate = currentProjects.find(p => p.id === projectId)
-      if (projectToUpdate && projectToUpdate.project_features) {
-        const newFeatures = Array.from(projectToUpdate.project_features)
-        const [reorderedItem] = newFeatures.splice(sourceIndex, 1)
-        newFeatures.splice(destIndex, 0, reorderedItem)
-        
-        await updateFeatureOrder(projectId, newFeatures)
-      }
-    } else if (result.type === 'project') {
-      const updatedProjects = Array.from(currentProjects)
-      const [reorderedItem] = updatedProjects.splice(sourceIndex, 1)
-      updatedProjects.splice(destIndex, 0, reorderedItem)
+    if (result.type === 'project') {
+      const updatedProjects = Array.from(currentProjects);
+      const [reorderedItem] = updatedProjects.splice(sourceIndex, 1);
+      updatedProjects.splice(destIndex, 0, reorderedItem);
 
       // Update the sort_order of projects in the database
-      for (let i = 0; i < updatedProjects.length; i++) {
-        await updateProject({ ...updatedProjects[i], sort_order: i })
+      const updates = updatedProjects.map((project, index) => ({
+        id: project.id,
+        sort_order: index
+      }));
+
+      console.log('Updates to be sent:', updates);
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('projects')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+
+        if (error) {
+          console.error('Error updating project order:', error);
+          return; // Exit the loop if there's an error
+        }
       }
 
       // Update local state with the new order
-      setProjects((prev): Project[] => {
+      setProjects(prev => {
         const newProjects = prev.map(p => {
           const updatedProject = updatedProjects.find(up => up.id === p.id);
           return updatedProject ? { ...p, sort_order: updatedProject.sort_order } : p;
         });
-        return newProjects;
+        return newProjects.sort((a, b) => a.sort_order - b.sort_order);
       });
+    } else if (result.type === 'feature') {
+      const projectId = result.source.droppableId.split('-')[1];
+      const projectToUpdate = currentProjects.find(p => p.id === projectId);
+      if (projectToUpdate && projectToUpdate.project_features) {
+        const newFeatures = Array.from(projectToUpdate.project_features);
+        const [reorderedItem] = newFeatures.splice(sourceIndex, 1);
+        newFeatures.splice(destIndex, 0, reorderedItem);
+
+        // Update feature order in the database
+        const updates = newFeatures.map((feature, index) => ({
+          id: feature.id,
+          sort_order: index
+        }));
+
+        const { error } = await supabase.from('project_features').upsert(updates);
+
+        if (error) {
+          console.error('Error updating feature order:', error);
+        } else {
+          // Update local state with the new feature order
+          setProjects(prev => prev.map(p =>
+            p.id === projectId
+              ? { ...p, project_features: newFeatures.sort((a, b) => a.sort_order - b.sort_order) }
+              : p
+          ));
+        }
+      }
     }
   }
 

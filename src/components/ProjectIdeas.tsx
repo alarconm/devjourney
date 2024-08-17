@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { Project, ProjectFeature } from '../types/project'
 
 export function ProjectIdeas() {
-  const { projects, addProject, removeProject, moveProject, updateProject, addProjectFeature, fetchProjects } = useAppContext<Project>()
+  const { projects, addProject, removeProject, moveProject, updateProject, addProjectFeature, fetchProjects, setProjects } = useAppContext()
   const [newIdea, setNewIdea] = useState({ title: '', description: '' })
   const [newFeature, setNewFeature] = useState('')
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
@@ -116,7 +116,7 @@ export function ProjectIdeas() {
         if (idea.id === ideaId) {
           const updatedFeatures = Array.from(idea.features || []);
           const [reorderedFeature] = updatedFeatures.splice(result.source.index, 1);
-          updatedFeatures.splice(result.destination.index, 0, reorderedFeature);
+          updatedFeatures.splice(result.destination?.index || 0, 0, reorderedFeature);
           return { ...idea, features: updatedFeatures };
         }
         return idea;
@@ -126,8 +126,8 @@ export function ProjectIdeas() {
       // Update feature order in the database
       const idea = updatedIdeas.find(i => i.id === ideaId);
       if (idea && idea.features) {
-        const updatedFeatures = idea.features.map((feature: string, index: number) => ({
-          text: feature,
+        const updatedFeatures = idea.features.map((feature: { text: string; order: number }, index: number) => ({
+          text: feature.text,
           order: index
         }));
 
@@ -135,7 +135,7 @@ export function ProjectIdeas() {
         const { error } = await supabase
           .from('idea_features')
           .upsert(
-            updatedFeatures.map(feature => ({
+            updatedFeatures.map((feature: { text: string; order: number }) => ({
               idea_id: ideaId,
               text: feature.text,
               order: feature.order
@@ -153,8 +153,11 @@ export function ProjectIdeas() {
   console.log('Ideas:', projects.filter(p => p.status === 'idea'));
 
   const handleMoveToProject = async (ideaId: string) => {
-    await moveProject(ideaId, 'in_progress');
-    fetchProjects(); // Refresh the projects list
+    const movedProject = await moveProject(ideaId, 'in_progress')
+    if (movedProject) {
+      setProjects(prev => prev.map(p => p.id === ideaId ? movedProject : p))
+    }
+    fetchProjects() // Refresh all projects to ensure consistency
   };
 
   return (
