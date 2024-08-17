@@ -22,7 +22,12 @@ const db = drizzle(pool);
 
 async function main() {
   console.log('Migration started');
-  console.log('Database URL:', databaseUrl.replace(/:\/\/[^@]+@/, '://****:****@'));
+  if (databaseUrl) {
+    console.log('Database URL:', databaseUrl.replace(/:\/\/[^@]+@/, '://****:****@'));
+  } else {
+    console.log('Database URL is not defined');
+    return;
+  }
   try {
     console.log('Attempting to connect to the database...');
     await pool.query('SELECT NOW()');

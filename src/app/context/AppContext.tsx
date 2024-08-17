@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Project, ProjectFeature, Skill, BrainstormingNote } from '@/types'
+import { Project, ProjectFeature, Skill, BrainstormingNote } from '@/types/project'
 
 type AppContextType = {
   projects: Project[]
@@ -51,7 +51,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else {
       const projectsWithSkills = data.map(project => ({
         ...project,
-        associatedSkills: project.project_skills.map(ps => ps.skill_id)
+        associatedSkills: project.project_skills.map((ps: { skill_id: string }) => ps.skill_id)
       }))
       setProjects(projectsWithSkills)
       setIdeas(projectsWithSkills.filter(p => p.status === 'idea'))
@@ -270,16 +270,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          progress: 0,
-          project_features: p.project_features?.map(f => ({ ...f, completed: false }))
-        }
-      }
-      return p
-    }))
+    setProjects(prev => prev.map(p => 
+      p.id === projectId ? { ...p, progress: 0, project_features: p.project_features?.map((f: ProjectFeature) => ({ ...f, completed: false })) } : p
+    ))
   }
 
   const addSkill = async (skillName: string) => {

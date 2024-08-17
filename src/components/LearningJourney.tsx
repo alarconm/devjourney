@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { useAppContext } from '@/app/context/AppContext'
+import { Project, ProjectFeature } from '@/types/project';
 
 export function LearningJourney() {
-  const { projects, skills, fetchProjects, fetchSkills } = useAppContext();
-  const [inProgressProjects, setInProgressProjects] = useState([]);
+  const { projects: contextProjects, skills, fetchProjects, fetchSkills } = useAppContext();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [inProgressProjects, setInProgressProjects] = useState<Project[]>([]);
   const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
   const [totalProgress, setTotalProgress] = useState(0);
 
@@ -18,33 +20,38 @@ export function LearningJourney() {
   }, []);
 
   useEffect(() => {
-    const currentProjects = projects.filter(p => p.status === 'in_progress');
-    setInProgressProjects(currentProjects);
-    const completedProjects = projects.filter(p => p.status === 'completed');
+    setProjects(contextProjects);
+    const currentProjects = contextProjects.filter(p => p.status === 'in_progress');
+    setInProgressProjects(currentProjects as Project[]);
+    const completedProjects = contextProjects.filter(p => p.status === 'completed');
     setCompletedProjectsCount(completedProjects.length);
 
     const totalFeatures = currentProjects.reduce((sum, project) => sum + (project.project_features?.length || 0), 0);
-    const completedFeatures = currentProjects.reduce((sum, project) => sum + (project.project_features?.filter(f => f.completed)?.length || 0), 0);
+    const completedFeatures = currentProjects.reduce((sum, project) => sum + (project.project_features?.filter((f: ProjectFeature) => f.completed).length || 0), 0);
     
     const calculatedTotalProgress = totalFeatures > 0 ? (completedFeatures / totalFeatures) * 100 : 0;
     setTotalProgress(Math.min(calculatedTotalProgress, 99));
-  }, [projects]);
+  }, [contextProjects]);
 
   const level = completedProjectsCount;
   const xpProgress = totalProgress;
 
   const gainedSkills = skills.filter(skill => 
-    projects.some(project => 
+    contextProjects.some(project => 
       project.status === 'completed' && 
       project.associatedSkills?.includes(skill.id)
     )
   );
 
-  const calculateSkillLevel = (skillId) => {
-    const projectsWithSkill = projects.filter(project => 
+  const calculateSkillLevel = (skillId: string) => {
+    const projectsWithSkill = contextProjects.filter(project => 
       project.associatedSkills?.includes(skillId) && project.status === 'completed'
     );
     return projectsWithSkill.length;
+  };
+
+  const handleSkillClick = (skillId: string) => {
+    // Handle skill click logic here
   };
 
   return (

@@ -100,47 +100,55 @@ export function ProjectIdeas() {
       const items = Array.from(projects);
       const [reorderedItem] = items.splice(result.source.index, 1);
       items.splice(result.destination?.index || 0, 0, reorderedItem);
-      updateProject(items);
+      
+      // Update each project's sort_order
+      const updatedProjects = items.map((project, index) => ({
+        ...project,
+        sort_order: index
+      }));
+
+      setProjects(updatedProjects);
 
       // Update idea order in the database
-      for (let i = 0; i < items.length; i++) {
+      for (let i = 0; i < updatedProjects.length; i++) {
         await supabase
-          .from('ideas')
-          .update({ order: i })
-          .eq('id', items[i].id);
+          .from('projects')
+          .update({ sort_order: i })
+          .eq('id', updatedProjects[i].id);
       }
     } else if (sourceDroppableId.startsWith('features-') && destinationDroppableId.startsWith('features-')) {
       // Reordering features within an idea
       const ideaId = sourceDroppableId.split('-')[1];
-      const updatedIdeas = projects.map(idea => {
-        if (idea.id === ideaId) {
-          const updatedFeatures = Array.from(idea.features || []);
+      const updatedProjects = projects.map(project => {
+        if (project.id === ideaId) {
+          const updatedFeatures = Array.from(project.project_features || []);
           const [reorderedFeature] = updatedFeatures.splice(result.source.index, 1);
           updatedFeatures.splice(result.destination?.index || 0, 0, reorderedFeature);
-          return { ...idea, features: updatedFeatures };
+          return { ...project, project_features: updatedFeatures };
         }
-        return idea;
+        return project;
       });
-      updateProject(updatedIdeas);
+      setProjects(updatedProjects);
 
       // Update feature order in the database
-      const idea = updatedIdeas.find(i => i.id === ideaId);
-      if (idea && idea.features) {
-        const updatedFeatures = idea.features.map((feature: { text: string; order: number }, index: number) => ({
-          text: feature.text,
-          order: index
+      const project = updatedProjects.find(p => p.id === ideaId);
+      if (project && project.project_features) {
+        const updatedFeatures = project.project_features.map((feature, index) => ({
+          ...feature,
+          sort_order: index
         }));
 
-        // Update features for this idea
+        // Update features for this project
         const { error } = await supabase
-          .from('idea_features')
+          .from('project_features')
           .upsert(
-            updatedFeatures.map((feature: { text: string; order: number }) => ({
-              idea_id: ideaId,
+            updatedFeatures.map(feature => ({
+              id: feature.id,
+              project_id: ideaId,
               text: feature.text,
-              order: feature.order
+              sort_order: feature.sort_order
             })),
-            { onConflict: 'idea_id,text' }
+            { onConflict: 'id' }
           );
 
         if (error) {

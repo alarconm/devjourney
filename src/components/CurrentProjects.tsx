@@ -12,7 +12,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/lib/supabase'
-import { Project, ProjectFeature } from '../types/project'
+import { ProjectFeature } from '../types/project'
 
 export function CurrentProjects() {
   const { projects, addProjectFeature, toggleProjectFeature, moveProject, skills, associateSkillWithProject, fetchProjects, updateFeatureOrder, fetchSkills, setProjects } = useAppContext()
@@ -100,7 +100,7 @@ export function CurrentProjects() {
         newFeatures.splice(destIndex, 0, reorderedItem);
 
         // Update feature order in the database
-        const updates = newFeatures.map((feature, index) => ({
+        const updates = (newFeatures as ProjectFeature[]).map((feature, index) => ({
           id: feature.id,
           sort_order: index
         }));
@@ -113,7 +113,7 @@ export function CurrentProjects() {
           // Update local state with the new feature order
           setProjects(prev => prev.map(p =>
             p.id === projectId
-              ? { ...p, project_features: newFeatures.sort((a, b) => a.sort_order - b.sort_order) }
+              ? { ...p, project_features: newFeatures.sort((a, b) => (a as ProjectFeature).sort_order - (b as ProjectFeature).sort_order) }
               : p
           ));
         }
