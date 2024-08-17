@@ -14,3 +14,15 @@ export interface Project {
     text: string;
     completed: boolean;
   }
+
+  export interface Skill {
+    id: string;
+    name: string;
+    level: number;
+  }
+
+  export interface BrainstormingNote {
+    id: string;
+    text: string;
+    timestamp: string;
+  }

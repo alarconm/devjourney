@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, boolean, timestamp, pgEnum, primaryKey } from 'drizzle-orm/pg-core'
 
 // Create an enum for project status
 export const projectStatusEnum = pgEnum('project_status', ['idea', 'in_progress', 'completed'])
