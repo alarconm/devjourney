@@ -24,7 +24,6 @@
 - Use Supabase client for database operations
 - Implement proper error handling for Supabase queries
 - Use Supabase Auth for user authentication
-- Utilize Supabase real-time subscriptions where appropriate
 
 # UI/UX
 - Use Tailwind CSS for styling
