@@ -5,16 +5,13 @@ import { useAppContext } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Project, ProjectFeature } from '../types/project'
 
 export function CompletedProjects() {
-  const { projects, moveProject, fetchProjects, resetProjectFeatures, skills } = useAppContext()
+  const { projects, moveProject, resetProjectFeatures, skills } = useAppContext()
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
   const completedProjects = projects.filter(p => p.status === 'completed')
-
-  useEffect(() => {
-    fetchProjects()
-  }, [fetchProjects])
 
   const toggleExpand = (projectId: string) => {
     setExpandedProjectId(prevId => prevId === projectId ? null : projectId)
@@ -22,8 +19,11 @@ export function CompletedProjects() {
 
   const handleMoveToCurrentProjects = async (projectId: string) => {
     await moveProject(projectId, 'in_progress')
-    await resetProjectFeatures(projectId)
   }
+
+  useEffect(() => {
+    // This effect will run whenever the projects state changes
+  }, [projects])
 
   return (
     <Card>
@@ -40,7 +40,7 @@ export function CompletedProjects() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-2">
-                {project.associatedSkills?.map((skillId) => {
+                {project.associatedSkills?.map((skillId: string) => {
                   const skill = skills.find(s => s.id === skillId)
                   return skill ? (
                     <Badge key={skillId} variant="secondary" className="text-white">
@@ -61,7 +61,7 @@ export function CompletedProjects() {
                 <div className="mt-2">
                   <h4 className="font-semibold mb-2">Features:</h4>
                   <ul>
-                    {project.project_features?.map(feature => (
+                    {project.project_features?.map((feature: ProjectFeature) => (
                       <li key={feature.id} className={feature.completed ? 'line-through' : ''}>
                         {feature.text}
                       </li>

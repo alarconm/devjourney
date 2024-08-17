@@ -8,12 +8,13 @@ type AppContextType = {
   projects: Project[]
   skills: Skill[]
   brainstormingNotes: BrainstormingNote[]
-  addProject: (project: Omit<Project, 'id' | 'status' | 'progress' | 'sortOrder'>) => Promise<Project | null>
-  updateProject: (project: Project) => Promise<void>
+  ideas: Project[]
+  addProject: (title: string, description: string) => Promise<Project | null>
+  updateProject: (updatedProject: Project) => Promise<Project | null>
   removeProject: (id: string) => Promise<void>
   addProjectFeature: (projectId: string, featureText: string) => Promise<ProjectFeature | null>
-  toggleProjectFeature: (projectId: string, featureId: string) => Promise<void>
-  moveProject: (projectId: string, newStatus: 'idea' | 'in_progress' | 'completed') => Promise<void>
+  toggleProjectFeature: (projectId: string, featureId: string) => Promise<Project | null>
+  moveProject: (projectId: string, newStatus: 'idea' | 'in_progress' | 'completed') => Promise<Project | null>
   addSkill: (skillName: string) => Promise<Skill | null>
   updateSkill: (skill: Skill) => Promise<void>
   removeSkill: (id: string) => Promise<void>
@@ -25,6 +26,7 @@ type AppContextType = {
   removeProjectFeature: (projectId: string, featureId: string) => Promise<void>
   resetProjectFeatures: (projectId: string) => Promise<void>
   updateFeatureOrder: (projectId: string, features: ProjectFeature[]) => Promise<void>
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -33,16 +35,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [skills, setSkills] = useState<Skill[]>([])
   const [brainstormingNotes, setBrainstormingNotes] = useState<BrainstormingNote[]>([])
+  const [ideas, setIdeas] = useState<Project[]>([])
 
   const fetchProjects = async () => {
     const { data, error } = await supabase
       .from('projects')
-      .select('*, project_features(*)')
+      .select(`
+        *,
+        project_features(*),
+        project_skills(skill_id)
+      `)
       .order('sort_order', { ascending: true })
     if (error) {
       console.error('Error fetching projects:', error)
     } else {
-      setProjects(data || [])
+      const projectsWithSkills = data.map(project => ({
+        ...project,
+        associatedSkills: project.project_skills.map(ps => ps.skill_id)
+      }))
+      setProjects(projectsWithSkills)
+      setIdeas(projectsWithSkills.filter(p => p.status === 'idea'))
     }
   }
 
@@ -76,48 +88,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchBrainstormingNotes()
   }, [])
 
-  const addProject = async (project: Omit<Project, 'id' | 'status' | 'progress' | 'sortOrder'>) => {
-    const { data: maxSortOrderProject } = await supabase
-      .from('projects')
-      .select('sort_order')
-      .order('sort_order', { ascending: false })
-      .limit(1)
-
-    const newSortOrder = maxSortOrderProject && maxSortOrderProject[0] ? maxSortOrderProject[0].sort_order + 1 : 0
-
+  const addProject = async (title: string, description: string) => {
     const { data, error } = await supabase
       .from('projects')
-      .insert([{ ...project, status: 'idea', progress: 0, sort_order: newSortOrder }])
+      .insert([{ title, description, status: 'idea', progress: 0 }])
       .select()
     if (error) {
       console.error('Error adding project:', error)
       return null
     }
-    setProjects(prev => [data[0], ...prev])
+    const newProject = data[0]
+    setProjects(prev => [...prev, newProject])
+    setIdeas(prev => [...prev, newProject])
+    return newProject
+  }
+
+  const updateProject = async (updatedProject: Project) => {
+    const { data, error } = await supabase
+      .from('projects')
+      .update(updatedProject)
+      .eq('id', updatedProject.id)
+      .select()
+    if (error) {
+      console.error('Error updating project:', error)
+      return null
+    }
+    setProjects(prev => prev.map(p => p.id === updatedProject.id ? data[0] : p))
+    setIdeas(prev => prev.map(p => p.id === updatedProject.id ? data[0] : p))
     return data[0]
   }
 
-  const updateProject = async (project: Project) => {
-    const { error } = await supabase
-      .from('projects')
-      .update(project)
-      .eq('id', project.id)
-    if (error) {
-      console.error('Error updating project:', error)
-    } else {
-      setProjects(prev => prev.map(p => p.id === project.id ? project : p))
-    }
-  }
-
   const removeProject = async (id: string) => {
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', id)
-    if (error) {
-      console.error('Error removing project:', error)
-    } else {
+    try {
+      // First, delete all associated features
+      await supabase
+        .from('project_features')
+        .delete()
+        .eq('project_id', id)
+
+      // Then, delete the project
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
       setProjects(prev => prev.filter(p => p.id !== id))
+      setIdeas(prev => prev.filter(p => p.id !== id))
+    } catch (error) {
+      console.error('Error removing project:', error)
     }
   }
 
@@ -140,60 +160,123 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const toggleProjectFeature = async (projectId: string, featureId: string) => {
-    const project = projects.find(p => p.id === projectId)
-    if (!project) return
+    const { data: feature, error: featureError } = await supabase
+      .from('project_features')
+      .select('*')
+      .eq('id', featureId)
+      .single()
 
-    const feature = project.project_features?.find(f => f.id === featureId)
-    if (!feature) return
+    if (featureError) {
+      console.error('Error fetching project feature:', featureError)
+      return null
+    }
 
     const { error } = await supabase
       .from('project_features')
       .update({ completed: !feature.completed })
       .eq('id', featureId)
-    
+
     if (error) {
       console.error('Error toggling project feature:', error)
-    } else {
-      const updatedProjects = projects.map(p => {
-        if (p.id === projectId) {
-          const updatedFeatures = p.project_features?.map(f =>
-            f.id === featureId ? { ...f, completed: !f.completed } : f
-          )
-          const completedFeatures = updatedFeatures?.filter(f => f.completed).length || 0
-          const totalFeatures = updatedFeatures?.length || 1
-          const progress = (completedFeatures / totalFeatures) * 100
-          const newStatus = progress === 100 ? 'completed' : p.status
+      return null
+    }
 
-          return {
-            ...p,
-            project_features: updatedFeatures,
-            progress,
-            status: newStatus
-          }
-        }
-        return p
-      })
-      setProjects(updatedProjects)
-
-      if (updatedProjects.find(p => p.id === projectId)?.status === 'completed') {
-        moveProject(projectId, 'completed')
+    const updatedProject = await updateProjectProgress(projectId)
+    
+    if (updatedProject) {
+      if (updatedProject.progress === 100) {
+        await moveProject(projectId, 'completed')
+      } else {
+        setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p))
       }
     }
+    
+    return updatedProject
+  }
+
+  const updateProjectProgress = async (projectId: string) => {
+    const { data: features, error: featuresError } = await supabase
+      .from('project_features')
+      .select('completed')
+      .eq('project_id', projectId)
+
+    if (featuresError) {
+      console.error('Error fetching project features:', featuresError)
+      return null
+    }
+
+    const totalFeatures = features.length
+    const completedFeatures = features.filter(f => f.completed).length
+    const progress = parseFloat(((completedFeatures / totalFeatures) * 100).toFixed(2))
+
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ progress })
+      .eq('id', projectId)
+      .select('*, project_features(*)')
+      .single()
+
+    if (error) {
+      console.error('Error updating project progress:', error)
+      return null
+    }
+
+    return data
   }
 
   const moveProject = async (projectId: string, newStatus: 'idea' | 'in_progress' | 'completed') => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('projects')
       .update({ status: newStatus })
       .eq('id', projectId)
+      .select()
+      .single()
 
     if (error) {
       console.error('Error moving project:', error)
-    } else {
-      setProjects(prevProjects => prevProjects.map(p => 
-        p.id === projectId ? { ...p, status: newStatus } : p
-      ))
+      return null
     }
+
+    if (newStatus === 'in_progress') {
+      await resetProjectFeatures(projectId)
+    }
+
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p))
+
+    return data
+  }
+
+  const resetProjectFeatures = async (projectId: string) => {
+    const { error: featuresError } = await supabase
+      .from('project_features')
+      .update({ completed: false })
+      .eq('project_id', projectId)
+
+    if (featuresError) {
+      console.error('Error resetting project features:', featuresError)
+      return
+    }
+
+    const { error: projectError } = await supabase
+      .from('projects')
+      .update({ progress: 0 })
+      .eq('id', projectId)
+
+    if (projectError) {
+      console.error('Error resetting project progress:', projectError)
+      return
+    }
+
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          progress: 0,
+          project_features: p.project_features?.map(f => ({ ...f, completed: false }))
+        }
+      }
+      return p
+    }))
   }
 
   const addSkill = async (skillName: string) => {
@@ -234,9 +317,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const associateSkillWithProject = async (projectId: string, skillId: string) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('project_skills')
       .insert([{ project_id: projectId, skill_id: skillId }])
+      .select()
     if (error) {
       console.error('Error associating skill with project:', error)
     } else {
@@ -244,11 +328,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (p.id === projectId) {
           return {
             ...p,
-            associatedSkills: [...(p.associatedSkills || []), skillId]
+            associatedSkills: [...new Set([...(p.associatedSkills || []), skillId])]
           }
         }
         return p
       }))
+      await fetchSkills()
     }
   }
 
@@ -277,26 +362,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const resetProjectFeatures = async (projectId: string) => {
-    const project = projects.find(p => p.id === projectId)
-    if (project && project.project_features) {
-      const updatedFeatures = project.project_features.map(feature => ({ ...feature, completed: false }))
-      
-      // Update features in the database
-      for (const feature of updatedFeatures) {
-        await supabase
-          .from('project_features')
-          .update({ completed: false })
-          .eq('id', feature.id)
-      }
-
-      // Update local state
-      setProjects(prevProjects => prevProjects.map(p => 
-        p.id === projectId ? { ...p, project_features: updatedFeatures } : p
-      ))
-    }
-  }
-
   const updateFeatureOrder = async (projectId: string, features: ProjectFeature[]) => {
     const { error } = await supabase
       .from('project_features')
@@ -315,6 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     projects,
     skills,
     brainstormingNotes,
+    ideas,
     addProject,
     updateProject,
     removeProject,
@@ -332,6 +398,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeProjectFeature,
     resetProjectFeatures,
     updateFeatureOrder,
+    setProjects,
   }
 
   return (

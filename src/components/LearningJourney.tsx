@@ -7,29 +7,42 @@ import { Badge } from "@/components/ui/badge"
 import { useAppContext } from '@/app/context/AppContext'
 
 export function LearningJourney() {
-  const { projects, skills } = useAppContext()
-  const [inProgressProjects, setInProgressProjects] = useState([])
-  const [completedProjectsCount, setCompletedProjectsCount] = useState(0)
-  const [averageProgress, setAverageProgress] = useState(0)
+  const { projects, skills, fetchProjects, fetchSkills } = useAppContext();
+  const [inProgressProjects, setInProgressProjects] = useState([]);
+  const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
+  const [averageProgress, setAverageProgress] = useState(0);
 
   useEffect(() => {
-    const currentProjects = projects.filter(p => p.status === 'in_progress')
-    setInProgressProjects(currentProjects)
-    setCompletedProjectsCount(projects.filter(p => p.status === 'completed').length)
+    fetchProjects();
+    fetchSkills();
+  }, []);
 
-    const totalProgress = currentProjects.reduce((sum, project) => sum + project.progress, 0)
-    setAverageProgress(currentProjects.length > 0 ? totalProgress / currentProjects.length : 0)
-  }, [projects])
+  useEffect(() => {
+    const currentProjects = projects.filter(p => p.status === 'in_progress');
+    setInProgressProjects(currentProjects);
+    setCompletedProjectsCount(projects.filter(p => p.status === 'completed').length);
 
-  const level = Math.floor(completedProjectsCount / 5) + 1
-  const xpProgress = Math.min(averageProgress, 99)
+    const totalProgress = currentProjects.reduce((sum, project) => sum + project.progress, 0);
+    const calculatedAverageProgress = currentProjects.length > 0 ? totalProgress / currentProjects.length : 0;
+    setAverageProgress(Math.min(calculatedAverageProgress, 99));
+  }, [projects]);
+
+  const level = Math.floor(completedProjectsCount / 5) + 1;
+  const xpProgress = averageProgress;
 
   const gainedSkills = skills.filter(skill => 
     projects.some(project => 
       project.status === 'completed' && 
       project.associatedSkills?.includes(skill.id)
     )
-  )
+  );
+
+  const calculateSkillLevel = (skillId) => {
+    const projectsWithSkill = projects.filter(project => 
+      project.associatedSkills?.includes(skillId) && project.status === 'completed'
+    );
+    return projectsWithSkill.length;
+  };
 
   return (
     <Card>
@@ -65,12 +78,9 @@ export function LearningJourney() {
           <CardContent>
             {gainedSkills.length > 0 ? (
               gainedSkills.map((skill) => (
-                <div key={skill.id} className="mb-2">
-                  <div className="flex justify-between items-center">
-                    <span>{skill.name}</span>
-                    <Badge>Level {skill.level}</Badge>
-                  </div>
-                  <Progress value={(skill.level / 10) * 100} className="mt-1" />
+                <div key={skill.id} className="flex items-center justify-between mb-2">
+                  <span>{skill.name}</span>
+                  <Badge variant="secondary">Level {calculateSkillLevel(skill.id)}</Badge>
                 </div>
               ))
             ) : (

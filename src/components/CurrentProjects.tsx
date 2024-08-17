@@ -11,33 +11,25 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { supabase } from '@/lib/supabase'
+import { RealtimeChannel } from '@supabase/supabase-js'
+import { Project, ProjectFeature } from '../types/project'
 
 export function CurrentProjects() {
-  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, moveProject, skills, associateSkillWithProject, fetchProjects, updateFeatureOrder } = useAppContext()
+  const { projects, updateProject, removeProject, addProjectFeature, toggleProjectFeature, moveProject, skills, associateSkillWithProject, fetchProjects, updateFeatureOrder, fetchSkills, setProjects } = useAppContext()
   const [newFeature, setNewFeature] = useState('')
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
 
   const currentProjects = projects.filter(p => p.status === 'in_progress')
-
-  useEffect(() => {
-    fetchProjects()
-  }, [])
 
   const toggleExpand = (projectId: string) => {
     setExpandedProjectId(prevId => prevId === projectId ? null : projectId)
   }
 
   const handleToggleProjectFeature = async (projectId: string, featureId: string) => {
-    await toggleProjectFeature(projectId, featureId)
-    const project = currentProjects.find(p => p.id === projectId)
-    if (project && project.project_features) {
-      const completedFeatures = project.project_features.filter(f => f.completed).length
-      const progress = (completedFeatures / project.project_features.length) * 100
-      await updateProject({ ...project, progress })
-      if (progress === 100) {
-        await moveProject(projectId, 'completed')
-        fetchProjects() // Refresh the projects list
-      }
+    const updatedProject = await toggleProjectFeature(projectId, featureId)
+    if (updatedProject && updatedProject.status === 'completed') {
+      setProjects(prev => prev.filter(p => p.id !== projectId))
     }
   }
 
@@ -82,8 +74,14 @@ export function CurrentProjects() {
         await updateProject({ ...updatedProjects[i], sort_order: i })
       }
 
-      // Fetch projects again to update the local state with the new order
-      fetchProjects()
+      // Update local state with the new order
+      setProjects((prev): Project[] => {
+        const newProjects = prev.map(p => {
+          const updatedProject = updatedProjects.find(up => up.id === p.id);
+          return updatedProject ? { ...p, sort_order: updatedProject.sort_order } : p;
+        });
+        return newProjects;
+      });
     }
   }
 
@@ -116,19 +114,11 @@ export function CurrentProjects() {
                             <Progress value={project.progress} className="mb-4" />
                             <div className="text-sm text-foreground mb-2">
                               <p className="font-semibold mb-1">Next Feature to Implement:</p>
-                              {project.project_features && project.project_features.find(f => !f.completed) && (
+                              {project.project_features && project.project_features.find((f: ProjectFeature) => !f.completed) && (
                                 <div className="p-2 bg-secondary/10 rounded">
-                                  <p>{project.project_features.find(f => !f.completed)?.text}</p>
+                                  <p>{project.project_features.find((f: ProjectFeature) => !f.completed)?.text}</p>
                                 </div>
                               )}
-                            </div>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                              {project.associatedSkills?.map((skillId) => {
-                                const skill = skills.find(s => s.id === skillId)
-                                return skill ? (
-                                  <Badge key={skillId} variant="secondary" className="text-white">{skill.name}</Badge>
-                                ) : null
-                              })}
                             </div>
                             <div className="flex space-x-2 mb-4">
                               <Button onClick={() => toggleExpand(project.id)} variant="secondary" className="bg-secondary text-secondary-foreground">
@@ -164,7 +154,7 @@ export function CurrentProjects() {
                                       ref={provided.innerRef}
                                       className={`space-y-2 ${snapshot.isDraggingOver ? 'bg-secondary/20' : ''}`}
                                     >
-                                      {project.project_features?.map((feature, index) => (
+                                      {project.project_features?.map((feature: ProjectFeature, index: number) => (
                                         <Draggable key={feature.id} draggableId={`${project.id}-${feature.id}`} index={index}>
                                           {(provided) => (
                                             <li
@@ -172,7 +162,7 @@ export function CurrentProjects() {
                                               {...provided.draggableProps}
                                               {...provided.dragHandleProps}
                                               className={`flex items-center p-2 bg-secondary/10 rounded ${
-                                                snapshot.isDragging ? 'opacity-50' : ''
+                                                snapshot.isDraggingOver ? 'opacity-50' : ''
                                               }`}
                                             >
                                               <Checkbox
@@ -213,7 +203,7 @@ export function CurrentProjects() {
                                     </SelectContent>
                                   </Select>
                                   <div className="flex flex-wrap gap-2 mt-2">
-                                    {project.associatedSkills?.map((skillId) => {
+                                    {project.associatedSkills?.map((skillId: string) => {
                                       const skill = skills.find(s => s.id === skillId)
                                       return skill ? (
                                         <Badge key={skillId} variant="secondary" className="text-white">
