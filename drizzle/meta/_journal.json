@@ -1,0 +1,20 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1723694641211,
+      "tag": "0000_minor_marvel_apes",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1723744570043,
+      "tag": "0001_heavy_wallop",
+      "breakpoints": true
+    }
+  ]
+}

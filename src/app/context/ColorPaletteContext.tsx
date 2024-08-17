@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ColorPalette, colorPalettes } from '@/lib/colorPalettes';
 
 type ColorPaletteContextType = {
@@ -13,17 +13,26 @@ const ColorPaletteContext = createContext<ColorPaletteContextType | undefined>(u
 export const ColorPaletteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentPalette, setCurrentPalette] = useState<ColorPalette>('default');
 
-  const setPalette = (palette: ColorPalette) => {
-    setCurrentPalette(palette);
+  useEffect(() => {
+    const savedPalette = localStorage.getItem('colorPalette') as ColorPalette;
+    if (savedPalette && colorPalettes[savedPalette]) {
+      setCurrentPalette(savedPalette);
+      applyPalette(savedPalette);
+    } else {
+      applyPalette('default');
+    }
+  }, []);
+
+  const applyPalette = (palette: ColorPalette) => {
     Object.entries(colorPalettes[palette]).forEach(([key, value]) => {
       document.documentElement.style.setProperty(`--${key}`, value);
     });
-    // Update the theme based on the palette
-    if (palette === 'cyberpink' || palette === 'midnight' || palette === 'neon' || palette === 'cyberblue' || palette === 'galaxy') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+  };
+
+  const setPalette = (palette: ColorPalette) => {
+    setCurrentPalette(palette);
+    applyPalette(palette);
+    localStorage.setItem('colorPalette', palette);
   };
 
   return (

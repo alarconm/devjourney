@@ -12,19 +12,19 @@ interface SkillSelectorProps {
 export function SkillSelector({ selectedSkills, onSkillSelect }: SkillSelectorProps) {
   const { skills } = useAppContext()
 
-  const availableSkills = skills.filter(skill => !selectedSkills.includes(skill.id))
-
   return (
     <Select onValueChange={onSkillSelect}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-[180px]">
         <SelectValue placeholder="Select a skill" />
       </SelectTrigger>
       <SelectContent>
-        {availableSkills.map((skill) => (
-          <SelectItem key={skill.id} value={skill.id}>
-            {skill.name}
-          </SelectItem>
-        ))}
+        {skills
+          .filter(skill => !selectedSkills.includes(skill.id))
+          .map(skill => (
+            <SelectItem key={skill.id} value={skill.id}>
+              {skill.name}
+            </SelectItem>
+          ))}
       </SelectContent>
     </Select>
   )

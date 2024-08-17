@@ -6,24 +6,24 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
 export function AddSkillForm() {
-  const [skillName, setSkillName] = useState('')
+  const [newSkill, setNewSkill] = useState('')
   const { addSkill } = useAppContext()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (skillName.trim()) {
-      addSkill({ name: skillName.trim() })
-      setSkillName('')
+    if (newSkill.trim()) {
+      await addSkill(newSkill.trim())
+      setNewSkill('')
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex space-x-2">
       <Input
-        type="text"
-        value={skillName}
-        onChange={(e) => setSkillName(e.target.value)}
-        placeholder="Enter new skill"
+        value={newSkill}
+        onChange={(e) => setNewSkill(e.target.value)}
+        placeholder="Add new skill"
+        className="flex-grow"
       />
       <Button type="submit">Add Skill</Button>
     </form>

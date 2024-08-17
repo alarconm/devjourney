@@ -4,10 +4,10 @@ import React from 'react'
 import { useAppContext } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SkillItem } from './SkillItem'
+import { AddSkillForm } from './AddSkillForm'
 
 export function SkillList() {
   const { skills } = useAppContext()
-  const gainedSkills = skills.filter(skill => skill.level > 0)
 
   return (
     <Card>
@@ -16,13 +16,16 @@ export function SkillList() {
         <CardDescription>Track your development skills</CardDescription>
       </CardHeader>
       <CardContent>
-        {gainedSkills.length > 0 ? (
-          gainedSkills.map(skill => (
-            <SkillItem key={skill.id} skill={skill} />
-          ))
-        ) : (
-          <p>No skills gained yet. Complete projects to level up your skills!</p>
-        )}
+        <AddSkillForm />
+        <div className="mt-4">
+          {skills.length > 0 ? (
+            skills.map(skill => (
+              <SkillItem key={skill.id} skill={skill} />
+            ))
+          ) : (
+            <p>No skills added yet. Add skills to track your progress!</p>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react'
-import { Skill } from '@/app/context/AppContext'
+import { Skill } from '@/types/project'
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 

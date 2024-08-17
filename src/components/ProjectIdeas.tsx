@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppContext } from '@/app/context/AppContext'
-import { Idea } from '@/app/context/AppContext'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,10 +9,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { supabase } from '@/lib/supabase'
+import { Project, ProjectFeature } from '../types/project'
 
 export function ProjectIdeas() {
-  const { ideas, ideaOrder, addIdea, removeIdea, reorderIdeas, moveIdeaToProject, addIdeaFeature, reorderIdeaFeatures } = useAppContext()
-  const [newIdea, setNewIdea] = useState({ title: '', description: '', features: [] })
+  const { projects, addProject, removeProject, moveProject, updateProject, addProjectFeature, fetchProjects, setProjects } = useAppContext()
+  const [newIdea, setNewIdea] = useState({ title: '', description: '' })
   const [newFeature, setNewFeature] = useState('')
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -21,49 +22,151 @@ export function ProjectIdeas() {
   const [isBrainstormingOpen, setIsBrainstormingOpen] = useState(false)
   const [archivedNotes, setArchivedNotes] = useState<Array<{ text: string, timestamp: string }>>([])
 
-  const handleBrainstormingSave = () => {
+  const handleRemoveIdea = async (ideaId: string) => {
+    await removeProject(ideaId);
+  };
+
+  const toggleExpand = (ideaId: string) => {
+    setExpandedIdeaId(prevId => prevId === ideaId ? null : ideaId);
+  };
+
+  const handleBrainstormingSave = async () => {
     if (brainstormingText.trim()) {
-      const timestamp = new Date().toLocaleString()
-      setArchivedNotes(prev => [...prev, { text: brainstormingText, timestamp }])
-      setBrainstormingText('')
+      const timestamp = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('brainstorming_notes')
+        .insert({ text: brainstormingText, timestamp })
+        .select()
+
+      if (error) {
+        console.error('Error saving brainstorming note:', error)
+      } else {
+        setArchivedNotes(prev => [data[0], ...prev])
+        setBrainstormingText('')
+      }
     }
     setIsBrainstormingOpen(false)
   }
 
-  const sortedIdeas = ideaOrder.map(id => ideas.find(i => i.id === id)).filter(Boolean) as Idea[]
-
-  const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return
-
-    const sourceIndex = result.source.index
-    const destinationIndex = result.destination.index
-
-    if (result.type === 'idea') {
-      reorderIdeas(sourceIndex, destinationIndex)
-    } else if (result.type === 'feature') {
-      const ideaId = result.draggableId.split('-')[0]
-      reorderIdeaFeatures(ideaId, sourceIndex, destinationIndex)
-    }
-  }
-
-  const toggleExpand = (ideaId: string) => {
-    setExpandedIdeaId(expandedIdeaId === ideaId ? null : ideaId)
-  }
-
-  const handleAddIdea = () => {
+  const handleAddIdea = async () => {
     if (newIdea.title && newIdea.description) {
-      addIdea({ ...newIdea, features: [] })
-      setNewIdea({ title: '', description: '', features: [] })
-      setIsDialogOpen(false)
+      try {
+        const addedProject = await addProject(newIdea.title, newIdea.description);
+        if (addedProject) {
+          setNewIdea({ title: '', description: '' });
+          setIsDialogOpen(false);
+          fetchProjects(); // Refresh the projects list
+        }
+      } catch (error) {
+        console.error('Error adding project:', error);
+      }
     }
   }
 
-  const handleAddFeature = (ideaId: string) => {
+  const handleAddFeature = async (ideaId: string) => {
     if (newFeature) {
-      addIdeaFeature(ideaId, newFeature)
-      setNewFeature('')
+      const addedFeature = await addProjectFeature(ideaId, newFeature)
+      if (addedFeature) {
+        setNewFeature('')
+        // No need to update local state here, as it's done in addIdeaFeature
+      }
     }
   }
+
+  useEffect(() => {
+    const fetchArchivedNotes = async () => {
+      const { data, error } = await supabase
+        .from('brainstorming_notes')
+        .select('*')
+        .order('timestamp', { ascending: false })
+      if (error) {
+        console.error('Error fetching archived notes:', error.message)
+      } else {
+        setArchivedNotes(data)
+      }
+    }
+
+    fetchArchivedNotes()
+  }, [])
+
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+
+    const sourceDroppableId = result.source.droppableId;
+    const destinationDroppableId = result.destination.droppableId;
+
+    if (sourceDroppableId === 'ideas' && destinationDroppableId === 'ideas') {
+      // Reordering ideas
+      const items = Array.from(projects);
+      const [reorderedItem] = items.splice(result.source.index, 1);
+      items.splice(result.destination?.index || 0, 0, reorderedItem);
+      
+      // Update each project's sort_order
+      const updatedProjects = items.map((project, index) => ({
+        ...project,
+        sort_order: index
+      }));
+
+      setProjects(updatedProjects);
+
+      // Update idea order in the database
+      for (let i = 0; i < updatedProjects.length; i++) {
+        await supabase
+          .from('projects')
+          .update({ sort_order: i })
+          .eq('id', updatedProjects[i].id);
+      }
+    } else if (sourceDroppableId.startsWith('features-') && destinationDroppableId.startsWith('features-')) {
+      // Reordering features within an idea
+      const ideaId = sourceDroppableId.split('-')[1];
+      const updatedProjects = projects.map(project => {
+        if (project.id === ideaId) {
+          const updatedFeatures = Array.from(project.project_features || []);
+          const [reorderedFeature] = updatedFeatures.splice(result.source.index, 1);
+          updatedFeatures.splice(result.destination?.index || 0, 0, reorderedFeature);
+          return { ...project, project_features: updatedFeatures };
+        }
+        return project;
+      });
+      setProjects(updatedProjects);
+
+      // Update feature order in the database
+      const project = updatedProjects.find(p => p.id === ideaId);
+      if (project && project.project_features) {
+        const updatedFeatures = project.project_features.map((feature, index) => ({
+          ...feature,
+          sort_order: index
+        }));
+
+        // Update features for this project
+        const { error } = await supabase
+          .from('project_features')
+          .upsert(
+            updatedFeatures.map(feature => ({
+              id: feature.id,
+              project_id: ideaId,
+              text: feature.text,
+              sort_order: feature.sort_order
+            })),
+            { onConflict: 'id' }
+          );
+
+        if (error) {
+          console.error('Error updating feature order:', error);
+        }
+      }
+    }
+  };
+
+  console.log('Ideas:', projects.filter(p => p.status === 'idea'));
+
+  const handleMoveToProject = async (ideaId: string) => {
+    const movedProject = await moveProject(ideaId, 'in_progress')
+    if (movedProject) {
+      setProjects(prev => prev.map(p => p.id === ideaId ? movedProject : p))
+    }
+    fetchProjects() // Refresh all projects to ensure consistency
+  };
 
   return (
     <Card>
@@ -79,7 +182,7 @@ export function ProjectIdeas() {
           <Droppable droppableId="ideas" type="idea">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef}>
-                {sortedIdeas.map((idea, index) => (
+                {projects.filter(p => p.status === 'idea').map((idea, index) => (
                   <Draggable key={idea.id} draggableId={idea.id} index={index}>
                     {(provided) => (
                       <div
@@ -98,15 +201,15 @@ export function ProjectIdeas() {
                               <Button onClick={() => toggleExpand(idea.id)}>
                                 {expandedIdeaId === idea.id ? 'Hide Details' : 'Show Details'}
                               </Button>
-                              <Button variant="gradient" onClick={() => moveIdeaToProject(idea.id)}>Start Project</Button>
+                              <Button variant="gradient" onClick={() => handleMoveToProject(idea.id)}>Start Project</Button>
                             </div>
                             {expandedIdeaId === idea.id && (
                               <div className="mt-2">
                                 <Droppable droppableId={`features-${idea.id}`} type="feature">
                                   {(provided) => (
                                     <ul {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-                                      {idea.features && idea.features.map((feature, featureIndex) => (
-                                        <Draggable key={`${idea.id}-${featureIndex}`} draggableId={`${idea.id}-${featureIndex}`} index={featureIndex}>
+                                      {idea.project_features && idea.project_features.map((feature: ProjectFeature, featureIndex: number) => (
+                                        <Draggable key={`${idea.id}-${feature.id}`} draggableId={`${idea.id}-${feature.id}`} index={featureIndex}>
                                           {(provided) => (
                                             <li
                                               ref={provided.innerRef}
@@ -114,7 +217,7 @@ export function ProjectIdeas() {
                                               {...provided.dragHandleProps}
                                               className="flex items-center bg-secondary/10 p-2 rounded"
                                             >
-                                              <span>{feature}</span>
+                                              <span>{feature.text}</span>
                                             </li>
                                           )}
                                         </Draggable>
@@ -146,7 +249,7 @@ export function ProjectIdeas() {
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => removeIdea(idea.id)}>
+                                        <AlertDialogAction onClick={() => handleRemoveIdea(idea.id)}>
                                           Remove
                                         </AlertDialogAction>
                                       </AlertDialogFooter>
